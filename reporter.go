@@ -87,7 +87,7 @@ func renderCallHeader(label string, c *C, prefix, suffix string) string {
 	out := fmt.Sprintf("%s%s %s: %s%s", prefix, label, niceFuncPath(pc),
 		niceFuncName(pc), suffix)
 
-	if *newMessageFlag {
+	if *teamcityMessageFlag {
 		out += teamcityOutput(label, c, niceFuncPath(pc), niceFuncName(pc), suffix) + "\n"
 	}
 

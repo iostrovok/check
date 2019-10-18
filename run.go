@@ -42,8 +42,8 @@ var (
 	newBenchMem    = flag.Bool("check.bmem", false, "Report memory benchmarks")
 	newListFlag    = flag.Bool("check.list", false, "List the names of all tests that will be run")
 	newWorkFlag    = flag.Bool("check.work", false, "Display and do not remove the test working directory")
-	newMessageFlag = flag.Bool("check.team", false, "Display messages for teamcity. check.vv or check.v flag is necessary")
-	addTestName    = flag.String("check.name", "", "Add prefix to teamcity test name")
+	teamcityMessageFlag = flag.Bool("check.team", false, "Display messages for teamcity. check.vv or check.v flag is necessary")
+	teamcityTestNameFlag    = flag.String("check.name", "", "Add prefix to teamcity test name")
 )
 
 // TestingT runs all test suites registered with the Suite function,
