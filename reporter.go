@@ -83,7 +83,14 @@ func (ow *outputWriter) WriteCallSuccess(label string, c *C) {
 
 func renderCallHeader(label string, c *C, prefix, suffix string) string {
 	pc := c.method.PC()
-	label = styleLabel(label)
-	return fmt.Sprintf("%s%s %s: %s%s", prefix, label, niceFuncPath(pc),
+
+	out := fmt.Sprintf("%s%s %s: %s%s", prefix, label, niceFuncPath(pc),
 		niceFuncName(pc), suffix)
+
+	if *teamcityMessageFlag {
+		out += teamcityOutput(label, c, niceFuncPath(pc), niceFuncName(pc), suffix) + "\n"
+	}
+
+	return out
+
 }
