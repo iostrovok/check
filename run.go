@@ -42,6 +42,7 @@ var (
 	newBenchMem    = flag.Bool("check.bmem", false, "Report memory benchmarks")
 	newListFlag    = flag.Bool("check.list", false, "List the names of all tests that will be run")
 	newWorkFlag    = flag.Bool("check.work", false, "Display and do not remove the test working directory")
+	newMessageFlag    = flag.Bool("check.mess", false, "Display messages as standard `go test -v` for each test")
 )
 
 // TestingT runs all test suites registered with the Suite function,
