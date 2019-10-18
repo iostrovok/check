@@ -9,26 +9,26 @@ package check
 // -----------------------------------------------------------------------
 // Internal type which deals with suite method calling.
 
-var StdMessages map[string]string
+var StdLabels map[string]string
 
 func init() {
-	StdMessages = map[string]string{
-		"FAIL EXPECTED": "--- FAIL:",
-		"FAIL":          "--- FAIL:",
-		"MISS":          "--- SKIP:",
-		"PANIC":         "--- FAIL:",
-		"PASS":          "--- PASS:",
-		"SKIP":          "--- SKIP:",
+	StdLabels = map[string]string{
+		"FAIL EXPECTED": "--- FAIL: ",
+		"FAIL":          "--- FAIL: ",
+		"MISS":          "--- SKIP: ",
+		"PANIC":         "--- FAIL: ",
+		"PASS":          "--- PASS: ",
+		"SKIP":          "--- SKIP: ",
 		"START":         "=== RUN",
 	}
 }
 
-func message(oldMessage string) string {
+func styleLabel(label string) string {
 	if *newMessageFlag {
-		if m, find := StdMessages[oldMessage]; find {
+		if m, find := StdLabels[label]; find {
 			return m
 		}
 	}
 
-	return oldMessage + ":"
+	return label + ":"
 }

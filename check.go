@@ -443,7 +443,7 @@ type resultTracker struct {
 func newResultTracker() *resultTracker {
 	return &resultTracker{_expectChan: make(chan *C), // Synchronous
 		_doneChan: make(chan *C, 32), // Asynchronous
-		_stopChan: make(chan bool)} // Synchronous
+		_stopChan: make(chan bool)}   // Synchronous
 }
 
 func (tracker *resultTracker) start() {
@@ -851,8 +851,10 @@ func (runner *suiteRunner) checkFixtureArgs() bool {
 	return succeeded
 }
 
+
+
 func (runner *suiteRunner) reportCallStarted(c *C) {
-	runner.output.WriteCallStarted(message("START"), c)
+	runner.output.WriteCallStarted("START", c)
 }
 
 func (runner *suiteRunner) reportCallDone(c *C) {
@@ -860,23 +862,23 @@ func (runner *suiteRunner) reportCallDone(c *C) {
 	switch c.status() {
 	case succeededSt:
 		if c.mustFail {
-			runner.output.WriteCallSuccess(message("FAIL EXPECTED"), c)
+			runner.output.WriteCallSuccess("FAIL EXPECTED", c)
 		} else {
-			runner.output.WriteCallSuccess(message("PASS"), c)
+			runner.output.WriteCallSuccess("PASS", c)
 		}
 	case skippedSt:
-		runner.output.WriteCallSuccess(message("SKIP"), c)
+		runner.output.WriteCallSuccess("SKIP", c)
 	case failedSt:
-		runner.output.WriteCallProblem(message("FAIL"), c)
+		runner.output.WriteCallProblem("FAIL", c)
 	case panickedSt:
-		runner.output.WriteCallProblem(message("PANIC"), c)
+		runner.output.WriteCallProblem("PANIC", c)
 	case fixturePanickedSt:
 		// That's a testKd call reporting that its fixture
 		// has panicked. The fixture call which caused the
 		// panic itself was tracked above. We'll report to
 		// aid debugging.
-		runner.output.WriteCallProblem(message("PANIC"), c)
+		runner.output.WriteCallProblem("PANIC", c)
 	case missedSt:
-		runner.output.WriteCallSuccess(message("MISS"), c)
+		runner.output.WriteCallSuccess("MISS", c)
 	}
 }
