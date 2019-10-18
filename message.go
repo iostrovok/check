@@ -13,12 +13,12 @@ var StdMessages map[string]string
 
 func init() {
 	StdMessages = map[string]string{
-		"FAIL EXPECTED": "--- FAIL",
-		"FAIL":          "--- FAIL",
-		"MISS":          "--- SKIP",
-		"PANIC":         "--- FAIL",
-		"PASS":          "--- PASS",
-		"SKIP":          "--- SKIP",
+		"FAIL EXPECTED": "--- FAIL:",
+		"FAIL":          "--- FAIL:",
+		"MISS":          "--- SKIP:",
+		"PANIC":         "--- FAIL:",
+		"PASS":          "--- PASS:",
+		"SKIP":          "--- SKIP:",
 		"START":         "=== RUN",
 	}
 }
@@ -30,5 +30,5 @@ func message(oldMessage string) string {
 		}
 	}
 
-	return oldMessage
+	return oldMessage + ":"
 }
