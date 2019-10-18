@@ -9,10 +9,10 @@ package check
 // -----------------------------------------------------------------------
 // Internal type which deals with suite method calling.
 
-var StdMessages map[]string
+var StdMessages map[string]string
 
 func init() {
-	StdMessages = map[]string{
+	StdMessages = map[string]string{
 		"FAIL EXPECTED": "--- FAIL",
 		"FAIL":          "--- FAIL",
 		"MISS":          "--- SKIP",
