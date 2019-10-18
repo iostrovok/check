@@ -92,9 +92,9 @@ func renderCallHeader(label string, c *C, prefix, suffix string) string {
 
 	out := fmt.Sprintf("%s%s %s: %s%s", prefix, label, niceFuncPath(pc),
 		niceFuncName(pc), suffix)
-	
+
 	if *newMessageFlag {
-		out += "\n" + outputTest(label, c, niceFuncPath(pc), niceFuncName(pc), suffix)
+		out += outputTest(label, c, niceFuncPath(pc), niceFuncName(pc), suffix) +"\n"
 	}
 
 	return out
@@ -124,11 +124,11 @@ func outputTest(status string, test *C, details ...string) string {
 	testName := escape(*addTestName + test.testName)
 
 	if status == "START" {
-		return fmt.Sprintf("##teamcity[testStarted timestamp='%s' name='%s' captureStandardOutput='true']\n", timeFormat(test.startTime), testName)
+		return fmt.Sprintf("##teamcity[testStarted timestamp='%s' name='%s' captureStandardOutput='true']", timeFormat(test.startTime), testName)
 	}
 
 	if status == "SKIP" || status == "MISS" {
-		return fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s']\n", now, testName)
+		return fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s']", now, testName)
 
 	}
 
@@ -138,16 +138,16 @@ func outputTest(status string, test *C, details ...string) string {
 	//	out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' message='Race detected!' details='%s']\n",
 	//		now, testName, escapeLines(details))
 	case "FAIL":
-		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' details='%s']\n",
+		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' details='%s']",
 			now, testName, escapeLines(details))
 	case "PASS":
 		// ignore
 	default:
-		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' message='Test ended in panic.' details='%s']\n",
+		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' message='Test ended in panic.' details='%s']",
 			now, testName, escapeLines(details))
 	}
 
-	out += fmt.Sprintf("##teamcity[testFinished timestamp='%s' name='%s' duration='%d']\n",
+	out += fmt.Sprintf("##teamcity[testFinished timestamp='%s' name='%s' duration='%d']",
 		now, testName, test.duration/time.Millisecond)
 
 	return out
