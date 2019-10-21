@@ -3,6 +3,7 @@ package check
 import (
 	"fmt"
 	"io"
+	"strings"
 	"sync"
 )
 
@@ -87,10 +88,10 @@ func renderCallHeader(label string, c *C, prefix, suffix string) string {
 	out := fmt.Sprintf("%s%s %s: %s%s", prefix, label, niceFuncPath(pc),
 		niceFuncName(pc), suffix)
 
-	if *teamcityMessageFlag {
+	switch strings.ToLower(*formattedMessageFlag) {
+	case "teamcity":
 		out += teamcityOutput(label, c, niceFuncPath(pc), niceFuncName(pc), suffix) + "\n"
 	}
 
 	return out
-
 }

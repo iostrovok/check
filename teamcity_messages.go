@@ -37,7 +37,7 @@ func escape(s string) string {
 
 func teamcityOutput(status string, test *C, details ...string) string {
 	now := timeFormat(time.Now())
-	testName := escape(*teamcityTestNameFlag + test.testName)
+	testName := escape(*formatMessageNamePrefixFlag + test.testName)
 
 	if status == "START" {
 		return fmt.Sprintf("##teamcity[testStarted timestamp='%s' name='%s' captureStandardOutput='true']", timeFormat(test.startTime), testName)

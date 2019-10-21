@@ -443,7 +443,7 @@ type resultTracker struct {
 func newResultTracker() *resultTracker {
 	return &resultTracker{_expectChan: make(chan *C), // Synchronous
 		_doneChan: make(chan *C, 32), // Asynchronous
-		_stopChan: make(chan bool)}   // Synchronous
+		_stopChan: make(chan bool)} // Synchronous
 }
 
 func (tracker *resultTracker) start() {
@@ -850,8 +850,6 @@ func (runner *suiteRunner) checkFixtureArgs() bool {
 	}
 	return succeeded
 }
-
-
 
 func (runner *suiteRunner) reportCallStarted(c *C) {
 	runner.output.WriteCallStarted("START", c)
