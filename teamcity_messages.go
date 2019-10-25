@@ -1,5 +1,10 @@
 /*
-	For more details see https://github.com/2tvenom/go-test-teamcity
+	Convert go test output to TeamCity format
+	Support Run, Skip, Pass, Fail
+
+	For more details see:
+		- https://github.com/2tvenom/go-test-teamcity
+		- https://confluence.jetbrains.com/display/TCD9/Build+Script+Interaction+with+TeamCity
 */
 
 package check
@@ -39,25 +44,23 @@ func teamcityOutput(status string, test *C, details ...string) string {
 	now := timeFormat(time.Now())
 	testName := escape(*formatMessageNamePrefixFlag + test.testName)
 
-	if status == "START" {
-		return fmt.Sprintf("##teamcity[testStarted timestamp='%s' name='%s' captureStandardOutput='true']", timeFormat(test.startTime), testName)
-	}
-
-	if status == "SKIP" || status == "MISS" {
-		return fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s']", now, testName)
+	switch status {
+	case "START":
+		return fmt.Sprintf("##teamcity[testStarted timestamp='%s' name='%s' captureStandardOutput='true']", test.startTime.Format(TeamcityTimestampFormat), testName)
+	case "SKIP":
+		return fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s' details='%s']", now, testName, "Test is skipped")
+	case "MISS":
+		return fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s' details='%s']", now, testName, "Test is missed")
 	}
 
 	out := ""
 	switch status {
-	//case "Race":
-	//	out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' message='Race detected!' details='%s']\n",
-	//		now, testName, escapeLines(details))
 	case "FAIL":
 		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' details='%s']",
 			now, testName, escapeLines(details))
-	case "PASS":
-		// ignore
-	default:
+	case "PASS", "FAIL EXPECTED":
+		// ignore success cases
+	default: // "PANIC"
 		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' message='Test ended in panic.' details='%s']",
 			now, testName, escapeLines(details))
 	}
