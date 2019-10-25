@@ -54,19 +54,19 @@ func teamcityOutput(status string, test *C, details ...string) string {
 	}
 
 	out := ""
-	stdOut := test.GetTestLog()
+	stdOut := strings.TrimSpace(test.GetTestLog())
 	if stdOut != "" {
-		out = fmt.Sprintf("##teamcity[testStdOut timestamp='%s' name='%s' out='%s']", now, testName, escape(stdOut))
+		out = fmt.Sprintf("##teamcity[testStdOut timestamp='%s' name='%s' out='%s']\n", now, testName, escape(stdOut))
 	}
 
 	switch status {
 	case "FAIL":
-		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' details='%s']",
+		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' details='%s']\n",
 			now, testName, escapeLines(details))
 	case "PASS", "FAIL EXPECTED":
 		// ignore success cases
 	default: // "PANIC"
-		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' message='Test ended in panic.' details='%s']",
+		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' message='Test ended in panic.' details='%s']\n",
 			now, testName, escapeLines(details))
 	}
 
