@@ -5,3 +5,6 @@ _*
 
 .idea/
 vendor/
+
+check_coverage.html
+check_test_coverage.html
