@@ -43,7 +43,7 @@ var (
 	newListFlag    = flag.Bool("check.list", false, "List the names of all tests that will be run")
 	newWorkFlag    = flag.Bool("check.work", false, "Display and do not remove the test working directory")
 
-	formattedMessageFlag    = flag.String("check.format", "", "Display formatted messages. Now 'teamcity' is only supported.")
+	formattedMessageFlag        = flag.String("check.format", "", "Display formatted messages. Now 'teamcity' is only supported.")
 	formatMessageNamePrefixFlag = flag.String("check.name", "", "Add name prefix to formatted messages.")
 )
 
