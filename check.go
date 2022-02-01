@@ -333,7 +333,8 @@ var asmGo = filepath.Join("runtime", "asm_")
 func (c *C) logPanic(skip int, value interface{}) {
 	skip++ // Our own frame.
 	initialSkip := skip
-	for ; ; skip++ {
+	for {
+		skip++
 		if pc, file, line, ok := runtime.Caller(skip); ok {
 			if skip == initialSkip {
 				c.logf("... Panic: %s (PC=0x%X)\n", value, pc)
@@ -487,6 +488,9 @@ func (tracker *resultTracker) _loopRoutine() {
 				case failedSt:
 					tracker.result.Failed++
 				case panickedSt:
+					fmt.Printf("Add: other.panickedSt: c.kind: %d!!!!\n", c.kind)
+					fmt.Printf("Add: other.panickedSt: fixtureKd: %d!!!!\n", fixtureKd)
+
 					if c.kind == fixtureKd {
 						tracker.result.FixturePanicked++
 					} else {

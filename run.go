@@ -121,6 +121,9 @@ func List(suite interface{}, runConf *RunConf) []string {
 // CheckTestResult methods.
 
 func (r *CheckTestResult) Add(other *CheckTestResult) {
+
+	fmt.Printf("Add: other.Panicked: %d\n", other.Panicked)
+
 	r.Succeeded += other.Succeeded
 	r.Skipped += other.Skipped
 	r.Failed += other.Failed
