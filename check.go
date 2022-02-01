@@ -488,8 +488,8 @@ func (tracker *resultTracker) _loopRoutine() {
 				case failedSt:
 					tracker.result.Failed++
 				case panickedSt:
-					fmt.Printf("Add: other.panickedSt: c.kind: %d!!!!\n", c.kind)
-					fmt.Printf("Add: other.panickedSt: fixtureKd: %d!!!!\n", fixtureKd)
+					fmt.Printf("PANICKED: Add: other.panickedSt: c.kind: %d!!!!\n", c.kind)
+					fmt.Printf("PANICKED: Add: other.panickedSt: fixtureKd: %d!!!!\n", fixtureKd)
 
 					if c.kind == fixtureKd {
 						tracker.result.FixturePanicked++

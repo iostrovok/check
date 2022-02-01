@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -122,7 +123,8 @@ func List(suite interface{}, runConf *RunConf) []string {
 
 func (r *CheckTestResult) Add(other *CheckTestResult) {
 
-	fmt.Printf("Add: other.Panicked: %d\n", other.Panicked)
+	fmt.Printf("PANICKED: Add: other.Panicked: %d\n", other.Panicked)
+	log.Printf("PANICKED: Add: other.Panicked: %d\n", other.Panicked)
 
 	r.Succeeded += other.Succeeded
 	r.Skipped += other.Skipped
