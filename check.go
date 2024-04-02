@@ -22,7 +22,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"testing"
 	"time"
+
+	"github.com/iostrovok/check/formatters"
 )
 
 // -----------------------------------------------------------------------
@@ -73,9 +76,9 @@ func (method *methodType) String() string {
 }
 
 func (method *methodType) matches(re *regexp.Regexp) bool {
-	return (re.MatchString(method.Info.Name) ||
+	return re.MatchString(method.Info.Name) ||
 		re.MatchString(method.suiteName()) ||
-		re.MatchString(method.String()))
+		re.MatchString(method.String())
 }
 
 type C struct {
@@ -91,7 +94,11 @@ type C struct {
 	tempDir   *tempDir
 	benchMem  bool
 	startTime time.Time
+	testingT  *testing.T
 	timer
+
+	formatter    formatters.Formatter
+	formatPrefix string
 }
 
 func (c *C) status() funcStatus {
@@ -416,9 +423,9 @@ func niceFuncName(pc uintptr) string {
 }
 
 // -----------------------------------------------------------------------
-// Result tracker to aggregate call results.
+// CheckTestResult tracker to aggregate call results.
 
-type Result struct {
+type CheckTestResult struct {
 	Succeeded        int
 	Failed           int
 	Skipped          int
@@ -431,7 +438,7 @@ type Result struct {
 }
 
 type resultTracker struct {
-	result          Result
+	result          CheckTestResult
 	_lastWasProblem bool
 	_waiting        int
 	_missed         int
@@ -531,6 +538,9 @@ type suiteRunner struct {
 	reportedProblemLast       bool
 	benchTime                 time.Duration
 	benchMem                  bool
+	testingT                  *testing.T
+	formatter                 formatters.Formatter
+	formatPrefix              string
 }
 
 type RunConf struct {
@@ -542,6 +552,9 @@ type RunConf struct {
 	BenchmarkTime time.Duration // Defaults to 1 second
 	BenchmarkMem  bool
 	KeepWorkDir   bool
+	testingT      *testing.T
+	formatter     formatters.Formatter
+	formatPrefix  string
 }
 
 // Create a new suiteRunner able to run all methods in the given suite.
@@ -570,6 +583,10 @@ func newSuiteRunner(suite interface{}, runConf *RunConf) *suiteRunner {
 		tempDir:   &tempDir{},
 		keepDir:   conf.KeepWorkDir,
 		tests:     make([]*methodType, 0, suiteNumMethods),
+		testingT:  conf.testingT,
+
+		formatter:    conf.formatter,
+		formatPrefix: conf.formatPrefix,
 	}
 	if runner.benchTime == 0 {
 		runner.benchTime = 1 * time.Second
@@ -614,7 +631,7 @@ func newSuiteRunner(suite interface{}, runConf *RunConf) *suiteRunner {
 }
 
 // Run all methods in the given suite.
-func (runner *suiteRunner) run() *Result {
+func (runner *suiteRunner) run() *CheckTestResult {
 	if runner.tracker.result.RunError == nil && len(runner.tests) > 0 {
 		runner.tracker.start()
 		if runner.checkFixtureArgs() {
@@ -667,6 +684,10 @@ func (runner *suiteRunner) forkCall(method *methodType, kind funcKind, testName 
 		timer:     timer{benchTime: runner.benchTime},
 		startTime: time.Now(),
 		benchMem:  runner.benchMem,
+		testingT:  runner.testingT,
+
+		formatter:    runner.formatter,
+		formatPrefix: runner.formatPrefix,
 	}
 	runner.tracker.expectCall(c)
 	go (func() {

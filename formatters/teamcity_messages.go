@@ -7,7 +7,7 @@
 		- https://confluence.jetbrains.com/display/TCD9/Build+Script+Interaction+with+TeamCity
 */
 
-package check
+package formatters
 
 import (
 	"fmt"
@@ -40,26 +40,27 @@ func escape(s string) string {
 	return s
 }
 
-func teamcityOutput(status string, test *C, details ...string) string {
+func TeamcityOutput(status string, testName, stdOut string, startTime time.Time, testDuration time.Duration,
+	formatMessageNamePrefixFlag string, details ...string) string {
 	now := timeFormat(time.Now())
-	testName := escape(*formatMessageNamePrefixFlag + test.testName)
+	testName = escape(formatMessageNamePrefixFlag + testName)
 
-	switch status {
-	case "START":
-		return fmt.Sprintf("##teamcity[testStarted timestamp='%s' name='%s' captureStandardOutput='true']", test.startTime.Format(TeamcityTimestampFormat), testName)
-	case "SKIP":
-		return fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s' message='%s']", now, testName, "Test is skipped")
-	case "MISS":
-		return fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s' message='%s']", now, testName, "Test is missed")
+	if status == "START" {
+		return fmt.Sprintf("##teamcity[testStarted timestamp='%s' name='%s' captureStandardOutput='true']",
+			startTime.Format(TeamcityTimestampFormat), testName)
 	}
 
 	out := ""
-	stdOut := strings.TrimSpace(test.GetTestLog())
+	stdOut = strings.TrimSpace(stdOut)
 	if stdOut != "" {
 		out = fmt.Sprintf("##teamcity[testStdOut timestamp='%s' name='%s' out='%s']\n", now, testName, escape(stdOut))
 	}
 
 	switch status {
+	case "SKIP":
+		out += fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s' message='%s']\n", now, testName, "Test is skipped")
+	case "MISS":
+		out += fmt.Sprintf("##teamcity[testIgnored timestamp='%s' name='%s' message='%s']\n", now, testName, "Test is missed")
 	case "FAIL":
 		out += fmt.Sprintf("##teamcity[testFailed timestamp='%s' name='%s' details='%s']\n",
 			now, testName, escapeLines(details))
@@ -71,7 +72,7 @@ func teamcityOutput(status string, test *C, details ...string) string {
 	}
 
 	out += fmt.Sprintf("##teamcity[testFinished timestamp='%s' name='%s' duration='%d']",
-		now, testName, test.duration/time.Millisecond)
+		now, testName, testDuration/time.Millisecond)
 
 	return out
 }

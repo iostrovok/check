@@ -2,11 +2,15 @@ package check
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strings"
 
-	"github.com/kr/pretty"
+	cf "github.com/iostrovok/go-convert"
+
+	"github.com/iostrovok/check/pretty"
 )
 
 // -----------------------------------------------------------------------
@@ -23,14 +27,13 @@ type comment struct {
 //
 // For example:
 //
-//     c.Assert(v, Equals, 42, Commentf("Iteration #%d failed.", i))
+//	c.Assert(v, Equals, 42, Commentf("Iteration #%d failed.", i))
 //
 // Note that if the comment is constant, a better option is to
 // simply use a normal comment right above or next to the line, as
 // it will also get printed with any errors:
 //
-//     c.Assert(l, Equals, 8192) // Ensure buffer size is correct (bug #123)
-//
+//	c.Assert(l, Equals, 8192) // Ensure buffer size is correct (bug #123)
 func Commentf(format string, args ...interface{}) CommentInterface {
 	return &comment{format, args}
 }
@@ -74,8 +77,7 @@ func (info *CheckerInfo) Info() *CheckerInfo {
 //
 // For example:
 //
-//     c.Assert(a, Not(Equals), b)
-//
+//	c.Assert(a, Not(Equals), b)
 func Not(checker Checker) Checker {
 	return &notChecker{checker}
 }
@@ -101,6 +103,56 @@ func (checker *notChecker) Check(params []interface{}, names []string) (result b
 }
 
 // -----------------------------------------------------------------------
+// isTrue checker.
+
+type isTrueChecker struct {
+	*CheckerInfo
+}
+
+// The IsTrue checker tests whether the obtained value is true.
+// See https://github.com/iostrovok/go-convert/blob/master/bool.go for details about bool values.
+//
+// Example:
+//
+//	c.Assert(err, IsTrue)
+var IsTrue Checker = &isTrueChecker{
+	&CheckerInfo{Name: "IsTrue", Params: []string{"value"}},
+}
+
+func (checker *isTrueChecker) Check(params []interface{}, _ []string) (result bool, error string) {
+	return isTrue(params[0]), ""
+}
+
+func isTrue(obtained interface{}) (result bool) {
+	return cf.Bool(obtained)
+}
+
+// -----------------------------------------------------------------------
+// IsFalse checker.
+
+type isFalseChecker struct {
+	*CheckerInfo
+}
+
+// The IsFalse checker tests whether the obtained value is false.
+// See https://github.com/iostrovok/go-convert/blob/master/bool.go for details about bool values.
+//
+// Example:
+//
+//	c.Assert(err, isFalse)
+var IsFalse Checker = &isFalseChecker{
+	&CheckerInfo{Name: "IsFalse", Params: []string{"value"}},
+}
+
+func (checker *isFalseChecker) Check(params []interface{}, _ []string) (result bool, error string) {
+	return isFalse(params[0]), ""
+}
+
+func isFalse(obtained interface{}) (result bool) {
+	return !cf.Bool(obtained)
+}
+
+// -----------------------------------------------------------------------
 // IsNil checker.
 
 type isNilChecker struct {
@@ -111,8 +163,7 @@ type isNilChecker struct {
 //
 // For example:
 //
-//    c.Assert(err, IsNil)
-//
+//	c.Assert(err, IsNil)
 var IsNil Checker = &isNilChecker{
 	&CheckerInfo{Name: "IsNil", Params: []string{"value"}},
 }
@@ -144,11 +195,10 @@ type notNilChecker struct {
 //
 // For example:
 //
-//     c.Assert(iface, NotNil)
+//	c.Assert(iface, NotNil)
 //
 // This is an alias for Not(IsNil), made available since it's a
 // fairly common check.
-//
 var NotNil Checker = &notNilChecker{
 	&CheckerInfo{Name: "NotNil", Params: []string{"value"}},
 }
@@ -214,6 +264,15 @@ func formatUnequal(obtained interface{}, expected interface{}) string {
 %s`, formatMultiLine(strings.Join(diff, "\n"), false))
 }
 
+func formatUnsupportedType(params []interface{}) string {
+	out := "Comparing incomparable type " +
+		reflect.ValueOf(params[0]).Type().String() +
+		" and " +
+		reflect.ValueOf(params[1]).Type().String()
+
+	return out
+}
+
 type equalsChecker struct {
 	*CheckerInfo
 }
@@ -223,8 +282,7 @@ type equalsChecker struct {
 //
 // For example:
 //
-//     c.Assert(value, Equals, 42)
-//
+//	c.Assert(value, Equals, 42)
 var Equals Checker = &equalsChecker{
 	&CheckerInfo{Name: "Equals", Params: []string{"obtained", "expected"}},
 }
@@ -258,9 +316,8 @@ type deepEqualsChecker struct {
 //
 // For example:
 //
-//     c.Assert(value, DeepEquals, 42)
-//     c.Assert(array, DeepEquals, []string{"hi", "there"})
-//
+//	c.Assert(value, DeepEquals, 42)
+//	c.Assert(array, DeepEquals, []string{"hi", "there"})
 var DeepEquals Checker = &deepEqualsChecker{
 	&CheckerInfo{Name: "DeepEquals", Params: []string{"obtained", "expected"}},
 }
@@ -288,24 +345,105 @@ type hasLenChecker struct {
 //
 // For example:
 //
-//     c.Assert(list, HasLen, 5)
-//
+//	c.Assert(list, HasLen, 5)
 var HasLen Checker = &hasLenChecker{
 	&CheckerInfo{Name: "HasLen", Params: []string{"obtained", "n"}},
 }
 
 func (checker *hasLenChecker) Check(params []interface{}, names []string) (result bool, error string) {
-	n, ok := params[1].(int)
-	if !ok {
-		return false, "n must be an int"
+	n := 0
+	switch reflect.ValueOf(params[1]).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n = cf.Int(params[1])
+	default:
+		return false, fmt.Sprintf("n must be an int*, not %T", params[1])
 	}
+
 	value := reflect.ValueOf(params[0])
 	switch value.Kind() {
 	case reflect.Map, reflect.Array, reflect.Slice, reflect.Chan, reflect.String:
 	default:
-		return false, "obtained value type has no length"
+		return false, "obtained value type has no length property"
 	}
 	return value.Len() == n, ""
+}
+
+// -----------------------------------------------------------------------
+// HasLenMoreThan checker.
+
+type hasLenMoreThan struct {
+	*CheckerInfo
+}
+
+// The HasLenMoreThan checker verifies that the obtained value has
+// the length more than provided one. In many cases this is superior
+// to using Equals in conjunction with the len() function because
+// in case the check fails the value itself will be printed, instead of its length,
+// providing more details for figuring the problem.
+// Also it converts last parameter from any int* to int, that may be useful for use configured/calculated values.
+//
+// For example:
+//
+//	c.Assert(list, HasLenMoreThan, 5)
+var HasLenMoreThan Checker = &hasLenMoreThan{
+	&CheckerInfo{Name: "HasLenMoreThan", Params: []string{"obtained", "n"}},
+}
+
+func (checker *hasLenMoreThan) Check(params []interface{}, names []string) (result bool, error string) {
+	n := 0
+	switch reflect.ValueOf(params[1]).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n = cf.Int(params[1])
+	default:
+		return false, fmt.Sprintf("n must be an int*, not %T", params[1])
+	}
+
+	value := reflect.ValueOf(params[0])
+	switch value.Kind() {
+	case reflect.Map, reflect.Array, reflect.Slice, reflect.Chan, reflect.String:
+	default:
+		return false, "obtained value type has no length property"
+	}
+	return value.Len() > n, ""
+}
+
+// -----------------------------------------------------------------------
+// HasLenLessThan checker.l
+
+type hasLenLessThan struct {
+	*CheckerInfo
+}
+
+// The hasLenLessThan checker verifies that the obtained value has
+// the length less than provided one. In many cases this is superior
+// to using Equals in conjunction with the len() function because
+// in case the check fails the value itself will be printed, instead of its length,
+// providing more details for figuring the problem.
+// Also it converts last parameter from any int* to int, that may be useful for use configured/calculated values.
+//
+// For example:
+//
+//	c.Assert(list, HasLenLessThan, 5)
+var HasLenLessThan Checker = &hasLenLessThan{
+	&CheckerInfo{Name: "HasLenLessThan", Params: []string{"obtained", "n"}},
+}
+
+func (checker *hasLenLessThan) Check(params []interface{}, names []string) (result bool, error string) {
+	n := 0
+	switch reflect.ValueOf(params[1]).Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		n = cf.Int(params[1])
+	default:
+		return false, fmt.Sprintf("n must be an int*, not %T", params[1])
+	}
+
+	value := reflect.ValueOf(params[0])
+	switch value.Kind() {
+	case reflect.Map, reflect.Array, reflect.Slice, reflect.Chan, reflect.String:
+	default:
+		return false, "obtained value type has no length property"
+	}
+	return value.Len() < n, ""
 }
 
 // -----------------------------------------------------------------------
@@ -320,8 +458,7 @@ type errorMatchesChecker struct {
 //
 // For example:
 //
-//     c.Assert(err, ErrorMatches, "perm.*denied")
-//
+//	c.Assert(err, ErrorMatches, "perm.*denied")
 var ErrorMatches Checker = errorMatchesChecker{
 	&CheckerInfo{Name: "ErrorMatches", Params: []string{"value", "regex"}},
 }
@@ -352,8 +489,7 @@ type matchesChecker struct {
 //
 // For example:
 //
-//     c.Assert(err, Matches, "perm.*denied")
-//
+//	c.Assert(err, Matches, "perm.*denied")
 var Matches Checker = &matchesChecker{
 	&CheckerInfo{Name: "Matches", Params: []string{"value", "regex"}},
 }
@@ -395,9 +531,7 @@ type panicsChecker struct {
 //
 // For example:
 //
-//     c.Assert(func() { f(1, 2) }, Panics, &SomeErrorType{"BOOM"}).
-//
-//
+//	c.Assert(func() { f(1, 2) }, Panics, &SomeErrorType{"BOOM"}).
 var Panics Checker = &panicsChecker{
 	&CheckerInfo{Name: "Panics", Params: []string{"function", "expected"}},
 }
@@ -414,6 +548,10 @@ func (checker *panicsChecker) Check(params []interface{}, names []string) (resul
 		}
 		params[0] = recover()
 		names[0] = "panic"
+		if _, ok := params[0].(*runtime.PanicNilError); ok {
+			params[0] = nil
+		}
+
 		result = reflect.DeepEqual(params[0], params[1])
 	}()
 	f.Call(nil)
@@ -430,9 +568,7 @@ type panicMatchesChecker struct {
 //
 // For example:
 //
-//     c.Assert(func() { f(1, 2) }, PanicMatches, `open.*: no such file or directory`).
-//
-//
+//	c.Assert(func() { f(1, 2) }, PanicMatches, `open.*: no such file or directory`).
 var PanicMatches Checker = &panicMatchesChecker{
 	&CheckerInfo{Name: "PanicMatches", Params: []string{"function", "expected"}},
 }
@@ -449,7 +585,13 @@ func (checker *panicMatchesChecker) Check(params []interface{}, names []string) 
 		}
 		obtained := recover()
 		names[0] = "panic"
-		if e, ok := obtained.(error); ok {
+		if e, ok := obtained.(*runtime.PanicNilError); ok {
+			fmt.Printf("	e: ''%T'', %+v\n", e, e)
+			if e != nil {
+				errmsg = e.Error()
+			}
+			return
+		} else if e, ok := obtained.(error); ok {
 			params[0] = e.Error()
 		} else if _, ok := obtained.(string); ok {
 			params[0] = obtained
@@ -476,9 +618,8 @@ type fitsTypeChecker struct {
 //
 // For example:
 //
-//     c.Assert(value, FitsTypeOf, int64(0))
-//     c.Assert(value, FitsTypeOf, os.Error(nil))
-//
+//	c.Assert(value, FitsTypeOf, int64(0))
+//	c.Assert(value, FitsTypeOf, os.Error(nil))
 var FitsTypeOf Checker = &fitsTypeChecker{
 	&CheckerInfo{Name: "FitsTypeOf", Params: []string{"obtained", "sample"}},
 }
@@ -508,9 +649,8 @@ type implementsChecker struct {
 //
 // For example:
 //
-//     var e os.Error
-//     c.Assert(err, Implements, &e)
-//
+//	var e os.Error
+//	c.Assert(err, Implements, &e)
 var Implements Checker = &implementsChecker{
 	&CheckerInfo{Name: "Implements", Params: []string{"obtained", "ifaceptr"}},
 }
@@ -525,4 +665,519 @@ func (checker *implementsChecker) Check(params []interface{}, names []string) (r
 		return false, "ifaceptr should be a pointer to an interface variable"
 	}
 	return obtained.Type().Implements(ifaceptr.Elem().Type()), ""
+}
+
+// -----------------------------------------------------------------------
+// MoreThan checker.
+
+var NoMoreThanStringError = "Difference: first (string) parameter <= (string) second, expect more"
+
+type moreThan struct {
+	*CheckerInfo
+}
+
+// The MoreThan checker tests whether the obtained value is more than value.
+//
+// For example:
+//
+//    c.Assert(v1, MoreThan, v2) -> v1 > v2
+//    c.Assert(v1, LessThan, 23) -> v1 > 23
+//    c.Assert(v1, LessThan, "my string") -> v1 > "my string"
+//    c.Assert(v1, LessThan, []byte("my string")) -> string(v1) > "my string"
+//
+//	  defaults conversion for checking:
+//    Int, Int8, Int16, Int32, Int64 => Int64
+//	  Uint, Uint8, Uint16, Uint32, Uint64 => Uint64
+//	  float32 => float32
+//    []byte, string => string
+//    float64 => float64
+//
+
+var MoreThan Checker = &moreThan{
+	&CheckerInfo{Name: "MoreThan", Params: []string{"get", "should be more"}},
+}
+
+func (checker *moreThan) Check(params []interface{}, names []string) (result bool, error string) {
+	defer func() {
+		if v := recover(); v != nil {
+			result = false
+			error = fmt.Sprint(v)
+		} else if !result && error == "" {
+			error = fmt.Sprintf("Difference: %v <= %v", params[0], params[1])
+		}
+	}()
+
+	if a := []bool{isStringType(params[0]), isStringType(params[1])}; a[0] || a[1] {
+		if a[0] && a[1] {
+			if result = cf.String(params[0]) > cf.String(params[1]); !result {
+				error = "First (string) parameter equals (string) second, expect more"
+
+				// generic diff
+				if diff := pretty.Diff(cf.String(params[0]), cf.String(params[1])); len(diff) > 0 {
+					error = NoLessThanStringError
+				}
+			}
+		} else {
+			error = formatUnsupportedType(params)
+		}
+		return
+	}
+
+	rt := reflect.ValueOf(params[0]).Kind()
+	if rt == reflect.Ptr {
+		rt = reflect.ValueOf(params[0]).Type().Kind()
+	}
+
+	rt2 := reflect.ValueOf(params[1]).Kind()
+	if rt2 == reflect.Ptr {
+		rt2 = reflect.ValueOf(params[1]).Type().Kind()
+	}
+
+	// unsupported types
+	if rt != rt2 {
+		if reflect.Float32 == rt || reflect.Float32 == rt2 || reflect.Float64 == rt || reflect.Float64 == rt2 {
+			error = formatUnsupportedType(params)
+			return
+		}
+	}
+
+	switch rt {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		result = cf.Int64(params[0]) > cf.Int64(params[1])
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		result = cf.Uint64(params[0]) > cf.Uint64(params[1])
+	case reflect.Float32:
+		result = cf.Float32(params[0]) > cf.Float32(params[1])
+	case reflect.Float64:
+		result = cf.Float64(params[0]) > cf.Float64(params[1])
+	default:
+		error = formatUnsupportedType(params)
+	}
+
+	return
+}
+
+// -----------------------------------------------------------------------
+// LessThan checker.
+
+var NoLessThanStringError = "Difference: first (string) parameter <= (string) second, expect less"
+
+type lessThan struct {
+	*CheckerInfo
+}
+
+// The LessThan checker tests whether the obtained value is less than value.
+//
+// For example:
+//
+//    c.Assert(v1, LessThan, v2) -> v1 < v2
+//    c.Assert(v1, LessThan, 23) -> v1 < 23
+//    c.Assert(v1, LessThan, "my string") -> v1 < "my string"
+//    c.Assert(v1, LessThan, []byte("my string")) -> string(v1) < "my string"
+//
+//	  defaults conversion for checking:
+//    Int, Int8, Int16, Int32, Int64 => Int64
+//	  Uint, Uint8, Uint16, Uint32, Uint64 => Uint64
+//	  float32 => float32
+//    []byte, string => string
+//    float64 => float64
+//
+
+var LessThan Checker = &lessThan{
+	&CheckerInfo{Name: "LessThan", Params: []string{"get", "should be less"}},
+}
+
+func (checker *lessThan) Check(params []interface{}, names []string) (result bool, error string) {
+	defer func() {
+		if v := recover(); v != nil {
+			result = false
+			error = fmt.Sprint(v)
+		} else if !result && error == "" {
+			error = fmt.Sprintf("Difference: %v >= %v", params[0], params[1])
+		}
+	}()
+
+	if a := []bool{isStringType(params[0]), isStringType(params[1])}; a[0] || a[1] {
+		if a[0] && a[1] {
+			result = cf.String(params[0]) < cf.String(params[1])
+			if !result {
+				// generic diff
+				if diff := pretty.Diff(cf.String(params[0]), cf.String(params[1])); len(diff) > 0 {
+					error = NoLessThanStringError
+				} else {
+					error = "First (string) parameter equals (string) second, expect less"
+				}
+			}
+		} else {
+			error = formatUnsupportedType(params)
+		}
+		return
+	}
+
+	rt := reflect.ValueOf(params[0]).Kind()
+	if rt == reflect.Ptr {
+		rt = reflect.ValueOf(params[0]).Type().Kind()
+	}
+
+	rt2 := reflect.ValueOf(params[1]).Kind()
+	if rt2 == reflect.Ptr {
+		rt2 = reflect.ValueOf(params[1]).Type().Kind()
+	}
+
+	// unsupported types
+	if rt != rt2 {
+		if reflect.Float32 == rt || reflect.Float32 == rt2 || reflect.Float64 == rt || reflect.Float64 == rt2 {
+			error = formatUnsupportedType(params)
+			return
+		}
+	}
+
+	switch rt {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		result = cf.Int64(params[0]) < cf.Int64(params[1])
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		result = cf.Uint64(params[0]) < cf.Uint64(params[1])
+	case reflect.Float32:
+		result = cf.Float32(params[0]) < cf.Float32(params[1])
+	case reflect.Float64:
+		result = cf.Float64(params[0]) < cf.Float64(params[1])
+	default:
+		error = formatUnsupportedType(params)
+	}
+
+	return
+}
+
+// -----------------------------------------------------------------------
+// MoreOrEqualThan checker.
+
+var NoMoreOrEqualThanStringError = "Difference: first (string) parameter > (string) second, expect less or equal"
+
+type moreOrEqualThan struct {
+	*CheckerInfo
+}
+
+// The MoreOrEqualThan checker tests whether the obtained value is less than value.
+//
+// For example:
+//
+//    c.Assert(v1, MoreOrEqualThan, v2) -> v1 = v2
+//    c.Assert(v1, MoreOrEqualThan, 23) -> v1 >= 23
+//    c.Assert(v1, MoreOrEqualThan, "my string") -> v1 >= "my string"
+//    c.Assert(v1, MoreOrEqualThan, []byte("my string")) -> string(v1) >= "my string"
+//
+//	  defaults conversion for checking:
+//    Int, Int8, Int16, Int32, Int64 => Int64
+//	  Uint, Uint8, Uint16, Uint32, Uint64 => Uint64
+//	  float32 => float32
+//    []byte, string => string
+//    float64 => float64
+//
+
+var MoreOrEqualThan Checker = &moreOrEqualThan{
+	&CheckerInfo{Name: "MoreOrEqualThan", Params: []string{"get", "should be more or equal than"}},
+}
+
+func (checker *moreOrEqualThan) Check(params []interface{}, names []string) (result bool, error string) {
+	defer func() {
+		if v := recover(); v != nil {
+			result = false
+			error = fmt.Sprint(v)
+		} else if !result && error == "" {
+			error = fmt.Sprintf("Difference: %v < %v", params[0], params[1])
+		}
+	}()
+
+	if a := []bool{isStringType(params[0]), isStringType(params[1])}; a[0] || a[1] {
+		if a[0] && a[1] {
+			if result = cf.String(params[0]) >= cf.String(params[1]); !result {
+				error = NoMoreOrEqualThanStringError
+			}
+		} else {
+			error = formatUnsupportedType(params)
+		}
+		return
+	}
+
+	rt := reflect.ValueOf(params[0]).Kind()
+	if rt == reflect.Ptr {
+		rt = reflect.ValueOf(params[0]).Type().Kind()
+	}
+
+	rt2 := reflect.ValueOf(params[1]).Kind()
+	if rt2 == reflect.Ptr {
+		rt2 = reflect.ValueOf(params[1]).Type().Kind()
+	}
+
+	// unsupported types
+	if rt != rt2 {
+		if reflect.Float32 == rt || reflect.Float32 == rt2 || reflect.Float64 == rt || reflect.Float64 == rt2 {
+			error = formatUnsupportedType(params)
+			return
+		}
+	}
+
+	switch rt {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		result = cf.Int64(params[0]) >= cf.Int64(params[1])
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		result = cf.Uint64(params[0]) >= cf.Uint64(params[1])
+	case reflect.Float32:
+		result = cf.Float32(params[0]) >= cf.Float32(params[1])
+	case reflect.Float64:
+		result = cf.Float64(params[0]) >= cf.Float64(params[1])
+	default:
+		error = formatUnsupportedType(params)
+	}
+
+	return
+}
+
+func isStringType(p interface{}) bool {
+	strName := reflect.ValueOf(p).Type().String()
+	return strName == "string" || strName == "[]uint8"
+}
+
+// -----------------------------------------------------------------------
+// LessOrEqualThan checker.
+var NoLessOrEqualThanStringError = "Difference: first (string) parameter > (string) second, expect less or equal"
+
+type lessOrEqualThan struct {
+	*CheckerInfo
+}
+
+// The LessOrEqualThan checker tests whether the obtained value is less than value.
+//
+// For example:
+//
+//	   c.Assert(v1, LessOrEqualThan, 23) -> v1 <= v2
+//	   c.Assert(v1, LessOrEqualThan, "my string") -> v1 <= v2
+//
+//		  defaults conversion for checking:
+//	   Int, Int8, Int16, Int32, Int64 => Int64
+//		  Uint, Uint8, Uint16, Uint32, Uint64 => Uint64
+//		  float32 => float32
+//	   []byte, string => string
+//	   float64 => float64
+var LessOrEqualThan Checker = &lessOrEqualThan{
+	&CheckerInfo{Name: "MoreOrEqualThan", Params: []string{"get", "should be more or equal than"}},
+}
+
+func (checker *lessOrEqualThan) Check(params []interface{}, names []string) (result bool, error string) {
+	defer func() {
+		if v := recover(); v != nil {
+			result = false
+			error = fmt.Sprint(v)
+		} else if !result && error == "" {
+			error = fmt.Sprintf("Difference: %v > %v", params[0], params[1])
+		}
+	}()
+
+	if a := []bool{isStringType(params[0]), isStringType(params[1])}; a[0] || a[1] {
+		if a[0] && a[1] {
+			if result = cf.String(params[0]) <= cf.String(params[1]); !result {
+				error = NoLessOrEqualThanStringError
+			}
+		} else {
+			error = formatUnsupportedType(params)
+		}
+		return
+	}
+
+	rt := reflect.ValueOf(params[0]).Kind()
+	if rt == reflect.Ptr {
+		rt = reflect.ValueOf(params[0]).Type().Kind()
+	}
+
+	rt2 := reflect.ValueOf(params[1]).Kind()
+	if rt2 == reflect.Ptr {
+		rt2 = reflect.ValueOf(params[1]).Type().Kind()
+	}
+
+	// unsupported types
+	if rt != rt2 {
+		if reflect.Float32 == rt || reflect.Float32 == rt2 || reflect.Float64 == rt || reflect.Float64 == rt2 {
+			error = formatUnsupportedType(params)
+			return
+		}
+	}
+
+	switch rt {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		result = cf.Int64(params[0]) <= cf.Int64(params[1])
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		result = cf.Uint64(params[0]) <= cf.Uint64(params[1])
+	case reflect.Float32:
+		result = cf.Float32(params[0]) <= cf.Float32(params[1])
+	case reflect.Float64:
+		result = cf.Float64(params[0]) <= cf.Float64(params[1])
+	default:
+		error = formatUnsupportedType(params)
+	}
+
+	return
+}
+
+// -----------------------------------------------------------------------
+// EqualsMore checker.
+var NoEqualsMoreStringError = "Difference: first (string) parameter does not equals (string) second, expect 'equals'"
+
+type equalsMore struct {
+	*CheckerInfo
+}
+
+// The EqualsMore checker verifies that the obtained value is equal to
+// the expected value, as Equals checker, but converts parameters if it is possible.
+//
+// For example:
+//
+//     c.Assert(value, Equals, 42)
+//     c.Assert(42, Equals, int64(42)) // true
+//     c.Assert(int32(42), Equals, int64(42)) // true
+//
+//	  defaults conversion for checking:
+//    Int, Int8, Int16, Int32, Int64 => Int64
+//	  Uint, Uint8, Uint16, Uint32, Uint64 => Uint64
+//	  float32 => float32
+//    []byte, string => string
+//    float64 => float64
+//
+
+var EqualsMore Checker = &equalsMore{
+	&CheckerInfo{Name: "EqualsMore", Params: []string{"get", "should be equal"}},
+}
+
+func (checker *equalsMore) Check(params []interface{}, names []string) (result bool, error string) {
+	defer func() {
+		if v := recover(); v != nil {
+			result = false
+			error = fmt.Sprint(v)
+		} else if !result && error == "" {
+			error = fmt.Sprintf("Difference: %v != %v", params[0], params[1])
+		}
+	}()
+
+	if a := []bool{isStringType(params[0]), isStringType(params[1])}; a[0] || a[1] {
+		if a[0] && a[1] {
+			if result = cf.String(params[0]) == cf.String(params[1]); !result {
+				error = NoEqualsMoreStringError
+			}
+		} else {
+			error = formatUnsupportedType(params)
+		}
+		return
+	}
+
+	rt := reflect.ValueOf(params[0]).Kind()
+	if rt == reflect.Ptr {
+		rt = reflect.ValueOf(params[0]).Type().Kind()
+	}
+
+	rt2 := reflect.ValueOf(params[1]).Kind()
+	if rt2 == reflect.Ptr {
+		rt2 = reflect.ValueOf(params[1]).Type().Kind()
+	}
+
+	// unsupported types
+	if rt != rt2 {
+		if reflect.Float32 == rt || reflect.Float32 == rt2 || reflect.Float64 == rt || reflect.Float64 == rt2 {
+			error = formatUnsupportedType(params)
+			return
+		}
+	}
+
+	switch rt {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		result = cf.Int64(params[0]) == cf.Int64(params[1])
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		result = cf.Uint64(params[0]) == cf.Uint64(params[1])
+	case reflect.Float32:
+		result = cf.Float32(params[0]) == cf.Float32(params[1])
+	case reflect.Float64:
+		result = cf.Float64(params[0]) == cf.Float64(params[1])
+	default:
+		error = formatUnsupportedType(params)
+	}
+
+	return
+}
+
+// -----------------------------------------------------------------------
+// EqualsFloat32 checker.
+
+var NoEqualsFloat32MoreThanMaxFloat32Error = "Comparing incomparable values as float32: one of parameters is more than math.MaxFloat32 / 2"
+var NoEqualsFloat32LessThanMaxFloat32Error = "Comparing incomparable values as float32: one of parameters is less than -1 * math.MaxFloat32 / 2"
+
+type equalsFloat32 struct {
+	*CheckerInfo
+}
+
+// The EqualsFloat32 checker verifies that the obtained value is equal to
+// the expected value as Equals checker, but ALWAYS converts parameters to float32 if it is possible.
+//
+// For example:
+//
+//     c.Assert(value, Equals, 42)
+//     c.Assert(42.0, Equals, int64(42)) // true
+//     c.Assert(int32(42), Equals, int64(42)) // true
+// //
+//    UnsupportedTypes:
+//    []byte, string
+//
+
+var EqualsFloat32 Checker = &equalsFloat32{
+	&CheckerInfo{Name: "EqualsFloat32", Params: []string{"get", "should be equal"}},
+}
+
+func (checker *equalsFloat32) Check(params []interface{}, names []string) (result bool, error string) {
+	defer func() {
+		if v := recover(); v != nil {
+			result = false
+			error = fmt.Sprint(v)
+		} else if !result && error == "" {
+			error = fmt.Sprintf("Difference: %v != %v", params[0], params[1])
+		}
+	}()
+
+	// unsupported types
+	error = "Comparing incomparable type as float32: " +
+		reflect.ValueOf(params[0]).Type().String() +
+		" and " +
+		reflect.ValueOf(params[1]).Type().String()
+
+	if isStringType(params[0]) || isStringType(params[1]) {
+		return
+	}
+
+	rt := reflect.ValueOf(params[0]).Kind()
+	if rt == reflect.Ptr {
+		rt = reflect.ValueOf(params[0]).Type().Kind()
+	}
+
+	rt2 := reflect.ValueOf(params[1]).Kind()
+	if rt2 == reflect.Ptr {
+		rt2 = reflect.ValueOf(params[1]).Type().Kind()
+	}
+
+	switch rt {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		switch rt2 {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+			reflect.Float32, reflect.Float64:
+
+			if cf.Float32(params[0]) > math.MaxFloat32/2 || cf.Float32(params[1]) > math.MaxFloat32/2 {
+				error = NoEqualsFloat32MoreThanMaxFloat32Error
+			} else if cf.Float32(params[0]) < -1*math.MaxFloat32/2 || cf.Float32(params[1]) < -1*math.MaxFloat32/2 {
+				error = NoEqualsFloat32LessThanMaxFloat32Error
+			} else {
+				result = cf.Float32(params[0]) == cf.Float32(params[1])
+				error = ""
+			}
+		}
+	}
+
+	return
 }
