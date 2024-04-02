@@ -103,6 +103,56 @@ func (checker *notChecker) Check(params []interface{}, names []string) (result b
 }
 
 // -----------------------------------------------------------------------
+// isTrue checker.
+
+type isTrueChecker struct {
+	*CheckerInfo
+}
+
+// The IsTrue checker tests whether the obtained value is true.
+// See https://github.com/iostrovok/go-convert/blob/master/bool.go for details about bool values.
+//
+// Example:
+//
+//	c.Assert(err, IsTrue)
+var IsTrue Checker = &isTrueChecker{
+	&CheckerInfo{Name: "IsTrue", Params: []string{"value"}},
+}
+
+func (checker *isTrueChecker) Check(params []interface{}, _ []string) (result bool, error string) {
+	return isTrue(params[0]), ""
+}
+
+func isTrue(obtained interface{}) (result bool) {
+	return cf.Bool(obtained)
+}
+
+// -----------------------------------------------------------------------
+// IsFalse checker.
+
+type isFalseChecker struct {
+	*CheckerInfo
+}
+
+// The IsFalse checker tests whether the obtained value is false.
+// See https://github.com/iostrovok/go-convert/blob/master/bool.go for details about bool values.
+//
+// Example:
+//
+//	c.Assert(err, isFalse)
+var IsFalse Checker = &isFalseChecker{
+	&CheckerInfo{Name: "IsFalse", Params: []string{"value"}},
+}
+
+func (checker *isFalseChecker) Check(params []interface{}, _ []string) (result bool, error string) {
+	return isFalse(params[0]), ""
+}
+
+func isFalse(obtained interface{}) (result bool) {
+	return !cf.Bool(obtained)
+}
+
+// -----------------------------------------------------------------------
 // IsNil checker.
 
 type isNilChecker struct {

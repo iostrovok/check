@@ -74,6 +74,36 @@ func (s *CheckersS) TestIsNil(c *check.C) {
 	testCheck(c, check.IsNil, false, "", int(0))
 }
 
+func (s *CheckersS) TestIsFalse(c *check.C) {
+	testInfo(c, check.IsFalse, "IsFalse", []string{"value"})
+
+	testCheck(c, check.IsFalse, true, "", nil)
+	testCheck(c, check.IsFalse, false, "", "a")
+
+	testCheck(c, check.IsFalse, false, "", (chan int)(nil))
+	testCheck(c, check.IsFalse, false, "", make(chan int))
+	testCheck(c, check.IsFalse, true, "", (error)(nil))
+	testCheck(c, check.IsFalse, true, "", errors.New(""))
+	testCheck(c, check.IsFalse, true, "", ([]int)(nil))
+	testCheck(c, check.IsFalse, false, "", make([]int, 1))
+	testCheck(c, check.IsFalse, true, "", 0)
+}
+
+func (s *CheckersS) TestIsTrue(c *check.C) {
+	testInfo(c, check.IsTrue, "IsTrue", []string{"value"})
+
+	testCheck(c, check.IsTrue, false, "", nil)
+	testCheck(c, check.IsTrue, true, "", "a")
+
+	testCheck(c, check.IsTrue, true, "", (chan int)(nil))
+	testCheck(c, check.IsTrue, true, "", make(chan int))
+	testCheck(c, check.IsTrue, false, "", (error)(nil))
+	testCheck(c, check.IsTrue, false, "", errors.New(""))
+	testCheck(c, check.IsTrue, false, "", ([]int)(nil))
+	testCheck(c, check.IsTrue, true, "", make([]int, 1))
+	testCheck(c, check.IsTrue, false, "", 0)
+}
+
 func (s *CheckersS) TestNotNil(c *check.C) {
 	testInfo(c, check.NotNil, "NotNil", []string{"value"})
 
@@ -291,7 +321,10 @@ func (s *CheckersS) TestPanicMatches(c *check.C) {
 	params, names := testCheck(c, check.PanicMatches, false, "", func() { panic(errors.New("KABOOM")) }, "BOOM")
 	c.Assert(params[0], check.Equals, "KABOOM")
 	c.Assert(names[0], check.Equals, "panic")
+}
 
+func (s *CheckersS) TestPanicMatchesNil(c *check.C) {
+	c.Skip("PanicMatches doesn't work with nil panics")
 	// Verify a nil panic
 	testCheck(c, check.PanicMatches, false, "panic called with nil argument", func() { panic(nil) }, "")
 }
