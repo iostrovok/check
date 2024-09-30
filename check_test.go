@@ -18,9 +18,9 @@ import (
 // We count the number of suites run at least to get a vague hint that the
 // test suite is behaving as it should.  Otherwise a bug introduced at the
 // very core of the system could go unperceived.
-const suitesRunExpected = 8
+const suitesRunExpected = 16
 
-var suitesRun int = 0
+var suitesRun = 0
 
 func Test(t *testing.T) {
 	check.TestingT(t)

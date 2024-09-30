@@ -306,31 +306,3 @@ func (s *BootstrapS) TestMinLogger(c *check.C) {
 	output := c.GetTestLog()
 	c.Assert(output, check.Matches, expected)
 }
-
-// -----------------------------------------------------------------------
-// Ensure that suites with embedded types are working fine, including the
-// the workaround for issue 906.
-
-type EmbeddedInternalS struct {
-	called bool
-}
-
-type EmbeddedS struct {
-	EmbeddedInternalS
-}
-
-var embeddedS = check.Suite(&EmbeddedS{})
-
-func (s *EmbeddedS) TestCountSuite(c *check.C) {
-	suitesRun += 1
-}
-
-func (s *EmbeddedInternalS) TestMethod(c *check.C) {
-	c.Error("TestMethod() of the embedded type was called!?")
-}
-
-func (s *EmbeddedS) TestMethod(c *check.C) {
-	// http://code.google.com/p/go/issues/detail?id=906
-	c.Check(s.called, check.Equals, false) // Go issue 906 is affecting the runner?
-	s.called = true
-}

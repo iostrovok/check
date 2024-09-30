@@ -1,6 +1,7 @@
 package check
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -18,7 +19,7 @@ import (
 
 type comment struct {
 	format string
-	args   []interface{}
+	args   []any
 }
 
 // Commentf returns an infomational value to use with Assert or Check calls.
@@ -34,8 +35,29 @@ type comment struct {
 // it will also get printed with any errors:
 //
 //	c.Assert(l, Equals, 8192) // Ensure buffer size is correct (bug #123)
-func Commentf(format string, args ...interface{}) CommentInterface {
+func Commentf(format string, args ...any) CommentInterface {
 	return &comment{format, args}
+}
+
+func commentArgs(args ...any) CommentInterface {
+	if len(args) == 0 {
+		return nil
+	}
+
+	if cf, ok := args[0].(CommentInterface); ok {
+		return cf
+	}
+
+	str, ok := args[0].(string)
+	if !ok {
+		return nil
+	}
+
+	if len(args) == 1 {
+		return &comment{format: str}
+	}
+
+	return &comment{format: str, args: args[1:]}
 }
 
 // CommentInterface must be implemented by types that attach extra
@@ -55,7 +77,7 @@ func (c *comment) CheckCommentString() string {
 // the Assert and Check verification methods.
 type Checker interface {
 	Info() *CheckerInfo
-	Check(params []interface{}, names []string) (result bool, error string)
+	Check(params []any, names []string) (result bool, error string)
 }
 
 // See the Checker interface.
@@ -92,7 +114,7 @@ func (checker *notChecker) Info() *CheckerInfo {
 	return &info
 }
 
-func (checker *notChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *notChecker) Check(params []any, names []string) (result bool, error string) {
 	result, error = checker.sub.Check(params, names)
 	result = !result
 	if result {
@@ -119,11 +141,11 @@ var IsTrue Checker = &isTrueChecker{
 	&CheckerInfo{Name: "IsTrue", Params: []string{"value"}},
 }
 
-func (checker *isTrueChecker) Check(params []interface{}, _ []string) (result bool, error string) {
+func (checker *isTrueChecker) Check(params []any, _ []string) (result bool, error string) {
 	return isTrue(params[0]), ""
 }
 
-func isTrue(obtained interface{}) (result bool) {
+func isTrue(obtained any) (result bool) {
 	return cf.Bool(obtained)
 }
 
@@ -144,11 +166,11 @@ var IsFalse Checker = &isFalseChecker{
 	&CheckerInfo{Name: "IsFalse", Params: []string{"value"}},
 }
 
-func (checker *isFalseChecker) Check(params []interface{}, _ []string) (result bool, error string) {
+func (checker *isFalseChecker) Check(params []any, _ []string) (result bool, error string) {
 	return isFalse(params[0]), ""
 }
 
-func isFalse(obtained interface{}) (result bool) {
+func isFalse(obtained any) (result bool) {
 	return !cf.Bool(obtained)
 }
 
@@ -168,11 +190,11 @@ var IsNil Checker = &isNilChecker{
 	&CheckerInfo{Name: "IsNil", Params: []string{"value"}},
 }
 
-func (checker *isNilChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *isNilChecker) Check(params []any, _ []string) (result bool, error string) {
 	return isNil(params[0]), ""
 }
 
-func isNil(obtained interface{}) (result bool) {
+func isNil(obtained any) (result bool) {
 	if obtained == nil {
 		result = true
 	} else {
@@ -203,14 +225,14 @@ var NotNil Checker = &notNilChecker{
 	&CheckerInfo{Name: "NotNil", Params: []string{"value"}},
 }
 
-func (checker *notNilChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *notNilChecker) Check(params []any, _ []string) (result bool, error string) {
 	return !isNil(params[0]), ""
 }
 
 // -----------------------------------------------------------------------
 // Equals checker.
 
-func diffworthy(a interface{}) bool {
+func diffworthy(a any) bool {
 	if a == nil {
 		return false
 	}
@@ -225,7 +247,7 @@ func diffworthy(a interface{}) bool {
 
 // formatUnequal will dump the actual and expected values into a textual
 // representation and return an error message containing a diff.
-func formatUnequal(obtained interface{}, expected interface{}) string {
+func formatUnequal(obtained any, expected any) string {
 	// We do not do diffs for basic types because go-check already
 	// shows them very cleanly.
 	if !diffworthy(obtained) || !diffworthy(expected) {
@@ -264,7 +286,7 @@ func formatUnequal(obtained interface{}, expected interface{}) string {
 %s`, formatMultiLine(strings.Join(diff, "\n"), false))
 }
 
-func formatUnsupportedType(params []interface{}) string {
+func formatUnsupportedType(params []any) string {
 	out := "Comparing incomparable type " +
 		reflect.ValueOf(params[0]).Type().String() +
 		" and " +
@@ -287,7 +309,7 @@ var Equals Checker = &equalsChecker{
 	&CheckerInfo{Name: "Equals", Params: []string{"obtained", "expected"}},
 }
 
-func (checker *equalsChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *equalsChecker) Check(params []any, _ []string) (result bool, error string) {
 	defer func() {
 		if v := recover(); v != nil {
 			result = false
@@ -299,6 +321,35 @@ func (checker *equalsChecker) Check(params []interface{}, names []string) (resul
 	if !result {
 		error = formatUnequal(params[0], params[1])
 	}
+
+	return
+}
+
+// -----------------------------------------------------------------------
+// NotEquals checker.
+
+type notEqualsChecker struct {
+	*CheckerInfo
+}
+
+// The NotEquals checker is the opposite of the Equals checker.
+var NotEquals Checker = &notEqualsChecker{
+	&CheckerInfo{Name: "NotEquals", Params: []string{"obtained", "expected"}},
+}
+
+func (checker *notEqualsChecker) Check(params []any, _ []string) (result bool, error string) {
+	defer func() {
+		if v := recover(); v != nil {
+			result = false
+			error = fmt.Sprint(v)
+		}
+	}()
+
+	result = params[0] != params[1]
+	if !result {
+		error = formatUnequal(params[0], params[1])
+	}
+
 	return
 }
 
@@ -322,7 +373,7 @@ var DeepEquals Checker = &deepEqualsChecker{
 	&CheckerInfo{Name: "DeepEquals", Params: []string{"obtained", "expected"}},
 }
 
-func (checker *deepEqualsChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *deepEqualsChecker) Check(params []any, _ []string) (result bool, error string) {
 	result = reflect.DeepEqual(params[0], params[1])
 	if !result {
 		error = formatUnequal(params[0], params[1])
@@ -350,7 +401,7 @@ var HasLen Checker = &hasLenChecker{
 	&CheckerInfo{Name: "HasLen", Params: []string{"obtained", "n"}},
 }
 
-func (checker *hasLenChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *hasLenChecker) Check(params []any, _ []string) (result bool, error string) {
 	n := 0
 	switch reflect.ValueOf(params[1]).Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -389,13 +440,13 @@ var HasLenMoreThan Checker = &hasLenMoreThan{
 	&CheckerInfo{Name: "HasLenMoreThan", Params: []string{"obtained", "n"}},
 }
 
-func (checker *hasLenMoreThan) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *hasLenMoreThan) Check(params []any, _ []string) (result bool, error string) {
 	n := 0
 	switch reflect.ValueOf(params[1]).Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		n = cf.Int(params[1])
 	default:
-		return false, fmt.Sprintf("n must be an int*, not %T", params[1])
+		return false, fmt.Sprintf("n must be an *int, not %T", params[1])
 	}
 
 	value := reflect.ValueOf(params[0])
@@ -404,6 +455,7 @@ func (checker *hasLenMoreThan) Check(params []interface{}, names []string) (resu
 	default:
 		return false, "obtained value type has no length property"
 	}
+
 	return value.Len() > n, ""
 }
 
@@ -428,7 +480,7 @@ var HasLenLessThan Checker = &hasLenLessThan{
 	&CheckerInfo{Name: "HasLenLessThan", Params: []string{"obtained", "n"}},
 }
 
-func (checker *hasLenLessThan) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *hasLenLessThan) Check(params []any, _ []string) (result bool, error string) {
 	n := 0
 	switch reflect.ValueOf(params[1]).Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
@@ -463,7 +515,7 @@ var ErrorMatches Checker = errorMatchesChecker{
 	&CheckerInfo{Name: "ErrorMatches", Params: []string{"value", "regex"}},
 }
 
-func (checker errorMatchesChecker) Check(params []interface{}, names []string) (result bool, errStr string) {
+func (checker errorMatchesChecker) Check(params []any, names []string) (result bool, errStr string) {
 	if params[0] == nil {
 		return false, "Error value is nil"
 	}
@@ -494,11 +546,11 @@ var Matches Checker = &matchesChecker{
 	&CheckerInfo{Name: "Matches", Params: []string{"value", "regex"}},
 }
 
-func (checker *matchesChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *matchesChecker) Check(params []any, _ []string) (result bool, error string) {
 	return matches(params[0], params[1])
 }
 
-func matches(value, regex interface{}) (result bool, error string) {
+func matches(value, regex any) (result bool, error string) {
 	reStr, ok := regex.(string)
 	if !ok {
 		return false, "Regex must be a string"
@@ -536,7 +588,7 @@ var Panics Checker = &panicsChecker{
 	&CheckerInfo{Name: "Panics", Params: []string{"function", "expected"}},
 }
 
-func (checker *panicsChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *panicsChecker) Check(params []any, names []string) (result bool, error string) {
 	f := reflect.ValueOf(params[0])
 	if f.Kind() != reflect.Func || f.Type().NumIn() != 0 {
 		return false, "Function must take zero arguments"
@@ -573,7 +625,7 @@ var PanicMatches Checker = &panicMatchesChecker{
 	&CheckerInfo{Name: "PanicMatches", Params: []string{"function", "expected"}},
 }
 
-func (checker *panicMatchesChecker) Check(params []interface{}, names []string) (result bool, errmsg string) {
+func (checker *panicMatchesChecker) Check(params []any, names []string) (result bool, errmsg string) {
 	f := reflect.ValueOf(params[0])
 	if f.Kind() != reflect.Func || f.Type().NumIn() != 0 {
 		return false, "Function must take zero arguments"
@@ -624,7 +676,7 @@ var FitsTypeOf Checker = &fitsTypeChecker{
 	&CheckerInfo{Name: "FitsTypeOf", Params: []string{"obtained", "sample"}},
 }
 
-func (checker *fitsTypeChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *fitsTypeChecker) Check(params []any, _ []string) (result bool, error string) {
 	obtained := reflect.ValueOf(params[0])
 	sample := reflect.ValueOf(params[1])
 	if !obtained.IsValid() {
@@ -655,7 +707,7 @@ var Implements Checker = &implementsChecker{
 	&CheckerInfo{Name: "Implements", Params: []string{"obtained", "ifaceptr"}},
 }
 
-func (checker *implementsChecker) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *implementsChecker) Check(params []any, _ []string) (result bool, error string) {
 	obtained := reflect.ValueOf(params[0])
 	ifaceptr := reflect.ValueOf(params[1])
 	if !obtained.IsValid() {
@@ -697,7 +749,7 @@ var MoreThan Checker = &moreThan{
 	&CheckerInfo{Name: "MoreThan", Params: []string{"get", "should be more"}},
 }
 
-func (checker *moreThan) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *moreThan) Check(params []any, _ []string) (result bool, error string) {
 	defer func() {
 		if v := recover(); v != nil {
 			result = false
@@ -787,7 +839,7 @@ var LessThan Checker = &lessThan{
 	&CheckerInfo{Name: "LessThan", Params: []string{"get", "should be less"}},
 }
 
-func (checker *lessThan) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *lessThan) Check(params []any, _ []string) (result bool, error string) {
 	defer func() {
 		if v := recover(); v != nil {
 			result = false
@@ -878,7 +930,7 @@ var MoreOrEqualThan Checker = &moreOrEqualThan{
 	&CheckerInfo{Name: "MoreOrEqualThan", Params: []string{"get", "should be more or equal than"}},
 }
 
-func (checker *moreOrEqualThan) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *moreOrEqualThan) Check(params []any, _ []string) (result bool, error string) {
 	defer func() {
 		if v := recover(); v != nil {
 			result = false
@@ -933,7 +985,7 @@ func (checker *moreOrEqualThan) Check(params []interface{}, names []string) (res
 	return
 }
 
-func isStringType(p interface{}) bool {
+func isStringType(p any) bool {
 	strName := reflect.ValueOf(p).Type().String()
 	return strName == "string" || strName == "[]uint8"
 }
@@ -963,7 +1015,7 @@ var LessOrEqualThan Checker = &lessOrEqualThan{
 	&CheckerInfo{Name: "MoreOrEqualThan", Params: []string{"get", "should be more or equal than"}},
 }
 
-func (checker *lessOrEqualThan) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *lessOrEqualThan) Check(params []any, _ []string) (result bool, error string) {
 	defer func() {
 		if v := recover(); v != nil {
 			result = false
@@ -1047,7 +1099,7 @@ var EqualsMore Checker = &equalsMore{
 	&CheckerInfo{Name: "EqualsMore", Params: []string{"get", "should be equal"}},
 }
 
-func (checker *equalsMore) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *equalsMore) Check(params []any, _ []string) (result bool, error string) {
 	defer func() {
 		if v := recover(); v != nil {
 			result = false
@@ -1129,7 +1181,7 @@ var EqualsFloat32 Checker = &equalsFloat32{
 	&CheckerInfo{Name: "EqualsFloat32", Params: []string{"get", "should be equal"}},
 }
 
-func (checker *equalsFloat32) Check(params []interface{}, names []string) (result bool, error string) {
+func (checker *equalsFloat32) Check(params []any, _ []string) (result bool, error string) {
 	defer func() {
 		if v := recover(); v != nil {
 			result = false
@@ -1180,4 +1232,94 @@ func (checker *equalsFloat32) Check(params []interface{}, names []string) (resul
 	}
 
 	return
+}
+
+// -----------------------------------------------------------------------
+// Contains checker.
+
+type contains struct {
+	*CheckerInfo
+}
+
+// The Contains checker verifies that the obtained value contains in array //
+// For example:
+//
+//     c.Assert(value, Contains, []int64{42})
+//     c.Assert(42, Contains, []int64{42}) // true
+//     c.Assert(42.0, Contains, []int64{42}) // false
+//     c.Assert(int32(42), Contains, []int64{42, 10}) // true
+//     c.Assert(int32(42), Contains, []int64{0, 10}) // false
+//
+//     type A struct { a int; b int }
+//     c.Assert(A{a:10, b:20}, Contains, []A{{a:1, b:0}, {a:10, b:20}}) // true
+//     c.Assert(&A{a:10, b:20}, Contains, []*A{{a:1, b:0}, {a:10, b:20}}) // true
+//     c.Assert(&A{a:10, b:20}, Contains, []*A{{a:1, b:0}, {a:5, b:16}}) // false
+//
+
+var Contains Checker = &contains{
+	&CheckerInfo{Name: "Contains", Params: []string{"obtained", "expected"}},
+}
+
+func (checker *contains) Check(params []any, _ []string) (result bool, error string) {
+	ok, found := containsElement(params[1], params[0])
+	if !ok {
+		return false, "expected value type is not Map, Array, Slice, Chan or String"
+	}
+	if !found {
+		return false, "expected does not contain obtained"
+	}
+
+	return true, ""
+}
+
+// -----------------------------------------------------------------------
+// NotContains checker.
+
+type notContains struct {
+	*CheckerInfo
+}
+
+// The NotContains is the opposite the Contains checker
+var NotContains Checker = &notContains{
+	&CheckerInfo{Name: "NotContains", Params: []string{"obtained", "expected"}},
+}
+
+func (checker *notContains) Check(params []any, _ []string) (result bool, error string) {
+	ok, found := containsElement(params[1], params[0])
+	if !ok || !found {
+		return true, ""
+	}
+
+	return false, "expected value contains obtained value"
+}
+
+// -----------------------------------------------------------------------
+// errorIs checker.
+
+type errorIs struct {
+	*CheckerInfo
+}
+
+// ErrorIs asserts that at least one of the errors in err's chain matches target.
+// This is a wrapper for errors.Is.
+var ErrorIs Checker = &errorIs{
+	&CheckerInfo{Name: "ErrorIs", Params: []string{"obtained", "expected"}},
+}
+
+func (checker *errorIs) Check(params []any, _ []string) (bool, string) {
+	obtained, ok := params[0].(error)
+	if !ok {
+		return false, "obtained value is not an error"
+	}
+
+	expected, ok := params[1].(error)
+	if !ok {
+		return false, "expected value is not an error"
+	}
+
+	if errors.Is(obtained, expected) {
+		return true, ""
+	}
+
+	return false, "expected error doesn't contains obtained error"
 }
