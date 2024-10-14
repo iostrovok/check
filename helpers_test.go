@@ -25,7 +25,7 @@ func (s *HelpersS) TestCountSuite(c *check.C) {
 
 type MyChecker struct {
 	info   *check.CheckerInfo
-	params []interface{}
+	params []any
 	names  []string
 	result bool
 	error  string
@@ -38,10 +38,10 @@ func (checker *MyChecker) Info() *check.CheckerInfo {
 	return checker.info
 }
 
-func (checker *MyChecker) Check(params []interface{}, names []string) (bool, string) {
+func (checker *MyChecker) Check(params []any, names []string) (bool, string) {
 	rparams := checker.params
 	rnames := checker.names
-	checker.params = append([]interface{}{}, params...)
+	checker.params = append([]any{}, params...)
 	checker.names = append([]string{}, names...)
 	if rparams != nil {
 		copy(params, rparams)
@@ -66,7 +66,7 @@ func myComment(s string) myCommentType {
 // Ensure a real checker actually works fine.
 
 func (s *HelpersS) TestCheckerInterface(c *check.C) {
-	testHelperSuccess(c, "Check(1, Equals, 1)", true, func() interface{} {
+	testHelperSuccess(c, "Check(1, Equals, 1)", true, func() any {
 		return c.Check(1, check.Equals, 1)
 	})
 }
@@ -76,20 +76,20 @@ func (s *HelpersS) TestCheckerInterface(c *check.C) {
 
 func (s *HelpersS) TestCheckSucceedWithExpected(c *check.C) {
 	checker := &MyChecker{result: true}
-	testHelperSuccess(c, "Check(1, checker, 2)", true, func() interface{} {
+	testHelperSuccess(c, "Check(1, checker, 2)", true, func() any {
 		return c.Check(1, checker, 2)
 	})
-	if !reflect.DeepEqual(checker.params, []interface{}{1, 2}) {
+	if !reflect.DeepEqual(checker.params, []any{1, 2}) {
 		c.Fatalf("Bad params for check: %#v", checker.params)
 	}
 }
 
 func (s *HelpersS) TestCheckSucceedWithoutExpected(c *check.C) {
 	checker := &MyChecker{result: true, info: &check.CheckerInfo{Params: []string{"myvalue"}}}
-	testHelperSuccess(c, "Check(1, checker)", true, func() interface{} {
+	testHelperSuccess(c, "Check(1, checker)", true, func() any {
 		return c.Check(1, checker)
 	})
-	if !reflect.DeepEqual(checker.params, []interface{}{1}) {
+	if !reflect.DeepEqual(checker.params, []any{1}) {
 		c.Fatalf("Bad params for check: %#v", checker.params)
 	}
 }
@@ -101,7 +101,7 @@ func (s *HelpersS) TestCheckFailWithExpected(c *check.C) {
 		"\\.+ myobtained int = 1\n" +
 		"\\.+ myexpected int = 2\n\n"
 	testHelperFailure(c, "Check(1, checker, 2)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker, 2)
 		})
 }
@@ -114,7 +114,7 @@ func (s *HelpersS) TestCheckFailWithExpectedAndComment(c *check.C) {
 		"\\.+ myexpected int = 2\n" +
 		"\\.+ Hello world!\n\n"
 	testHelperFailure(c, "Check(1, checker, 2, msg)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker, 2, myComment("Hello world!"))
 		})
 }
@@ -127,7 +127,7 @@ func (s *HelpersS) TestCheckFailWithExpectedAndStaticComment(c *check.C) {
 		"\\.+ myobtained int = 1\n" +
 		"\\.+ myexpected int = 2\n\n"
 	testHelperFailure(c, "Check(1, checker, 2, msg)", false, false, log,
-		func() interface{} {
+		func() any {
 			// Nice leading comment.
 			return c.Check(1, checker, 2) // Hello there
 		})
@@ -139,7 +139,7 @@ func (s *HelpersS) TestCheckFailWithoutExpected(c *check.C) {
 		"    return c\\.Check\\(1, checker\\)\n" +
 		"\\.+ myvalue int = 1\n\n"
 	testHelperFailure(c, "Check(1, checker)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker)
 		})
 }
@@ -151,7 +151,7 @@ func (s *HelpersS) TestCheckFailWithoutExpectedAndMessage(c *check.C) {
 		"\\.+ myvalue int = 1\n" +
 		"\\.+ Hello world!\n\n"
 	testHelperFailure(c, "Check(1, checker, msg)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker, myComment("Hello world!"))
 		})
 }
@@ -164,7 +164,7 @@ func (s *HelpersS) TestCheckWithMissingExpected(c *check.C) {
 		"\\.+ Wrong number of parameters for MyChecker: " +
 		"want 3, got 2\n\n"
 	testHelperFailure(c, "Check(1, checker, !?)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker)
 		})
 }
@@ -177,7 +177,7 @@ func (s *HelpersS) TestCheckWithTooManyExpected(c *check.C) {
 		"\\.+ Wrong number of parameters for MyChecker: " +
 		"want 3, got 4\n\n"
 	testHelperFailure(c, "Check(1, checker, 2, 3)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker, 2, 3)
 		})
 }
@@ -190,7 +190,7 @@ func (s *HelpersS) TestCheckWithError(c *check.C) {
 		"\\.+ myexpected int = 2\n" +
 		"\\.+ Some not so cool data provided!\n\n"
 	testHelperFailure(c, "Check(1, checker, 2)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker, 2)
 		})
 }
@@ -201,19 +201,19 @@ func (s *HelpersS) TestCheckWithNilChecker(c *check.C) {
 		"\\.+ Check\\(obtained, nil!\\?, \\.\\.\\.\\):\n" +
 		"\\.+ Oops\\.\\. you've provided a nil checker!\n\n"
 	testHelperFailure(c, "Check(obtained, nil)", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, nil)
 		})
 }
 
 func (s *HelpersS) TestCheckWithParamsAndNamesMutation(c *check.C) {
-	checker := &MyChecker{result: false, params: []interface{}{3, 4}, names: []string{"newobtained", "newexpected"}}
+	checker := &MyChecker{result: false, params: []any{3, 4}, names: []string{"newobtained", "newexpected"}}
 	log := "(?s)helpers_test\\.go:[0-9]+:.*\nhelpers_test\\.go:[0-9]+:\n" +
 		"    return c\\.Check\\(1, checker, 2\\)\n" +
 		"\\.+ newobtained int = 3\n" +
 		"\\.+ newexpected int = 4\n\n"
 	testHelperFailure(c, "Check(1, checker, 2) with mutation", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check(1, checker, 2)
 		})
 }
@@ -223,22 +223,22 @@ func (s *HelpersS) TestCheckWithParamsAndNamesMutation(c *check.C) {
 
 func (s *HelpersS) TestAssertSucceedWithExpected(c *check.C) {
 	checker := &MyChecker{result: true}
-	testHelperSuccess(c, "Assert(1, checker, 2)", nil, func() interface{} {
+	testHelperSuccess(c, "Assert(1, checker, 2)", nil, func() any {
 		c.Assert(1, checker, 2)
 		return nil
 	})
-	if !reflect.DeepEqual(checker.params, []interface{}{1, 2}) {
+	if !reflect.DeepEqual(checker.params, []any{1, 2}) {
 		c.Fatalf("Bad params for check: %#v", checker.params)
 	}
 }
 
 func (s *HelpersS) TestAssertSucceedWithoutExpected(c *check.C) {
 	checker := &MyChecker{result: true, info: &check.CheckerInfo{Params: []string{"myvalue"}}}
-	testHelperSuccess(c, "Assert(1, checker)", nil, func() interface{} {
+	testHelperSuccess(c, "Assert(1, checker)", nil, func() any {
 		c.Assert(1, checker)
 		return nil
 	})
-	if !reflect.DeepEqual(checker.params, []interface{}{1}) {
+	if !reflect.DeepEqual(checker.params, []any{1}) {
 		c.Fatalf("Bad params for check: %#v", checker.params)
 	}
 }
@@ -250,7 +250,7 @@ func (s *HelpersS) TestAssertFailWithExpected(c *check.C) {
 		"\\.+ myobtained int = 1\n" +
 		"\\.+ myexpected int = 2\n\n"
 	testHelperFailure(c, "Assert(1, checker, 2)", nil, true, log,
-		func() interface{} {
+		func() any {
 			c.Assert(1, checker, 2)
 			return nil
 		})
@@ -264,7 +264,7 @@ func (s *HelpersS) TestAssertFailWithExpectedAndMessage(c *check.C) {
 		"\\.+ myexpected int = 2\n" +
 		"\\.+ Hello world!\n\n"
 	testHelperFailure(c, "Assert(1, checker, 2, msg)", nil, true, log,
-		func() interface{} {
+		func() any {
 			c.Assert(1, checker, 2, myComment("Hello world!"))
 			return nil
 		})
@@ -276,7 +276,7 @@ func (s *HelpersS) TestAssertFailWithoutExpected(c *check.C) {
 		"    c\\.Assert\\(1, checker\\)\n" +
 		"\\.+ myvalue int = 1\n\n"
 	testHelperFailure(c, "Assert(1, checker)", nil, true, log,
-		func() interface{} {
+		func() any {
 			c.Assert(1, checker)
 			return nil
 		})
@@ -289,7 +289,7 @@ func (s *HelpersS) TestAssertFailWithoutExpectedAndMessage(c *check.C) {
 		"\\.+ myvalue int = 1\n" +
 		"\\.+ Hello world!\n\n"
 	testHelperFailure(c, "Assert(1, checker, msg)", nil, true, log,
-		func() interface{} {
+		func() any {
 			c.Assert(1, checker, myComment("Hello world!"))
 			return nil
 		})
@@ -303,7 +303,7 @@ func (s *HelpersS) TestAssertWithMissingExpected(c *check.C) {
 		"\\.+ Wrong number of parameters for MyChecker: " +
 		"want 3, got 2\n\n"
 	testHelperFailure(c, "Assert(1, checker, !?)", nil, true, log,
-		func() interface{} {
+		func() any {
 			c.Assert(1, checker)
 			return nil
 		})
@@ -317,7 +317,7 @@ func (s *HelpersS) TestAssertWithError(c *check.C) {
 		"\\.+ myexpected int = 2\n" +
 		"\\.+ Some not so cool data provided!\n\n"
 	testHelperFailure(c, "Assert(1, checker, 2)", nil, true, log,
-		func() interface{} {
+		func() any {
 			c.Assert(1, checker, 2)
 			return nil
 		})
@@ -329,7 +329,7 @@ func (s *HelpersS) TestAssertWithNilChecker(c *check.C) {
 		"\\.+ Assert\\(obtained, nil!\\?, \\.\\.\\.\\):\n" +
 		"\\.+ Oops\\.\\. you've provided a nil checker!\n\n"
 	testHelperFailure(c, "Assert(obtained, nil)", nil, true, log,
-		func() interface{} {
+		func() any {
 			c.Assert(1, nil)
 			return nil
 		})
@@ -345,7 +345,7 @@ func (s *HelpersS) TestValueLoggingWithArrays(c *check.C) {
 		"\\.+ myobtained \\[\\]uint8 = \\[\\]byte{0x1, 0x2}\n" +
 		"\\.+ myexpected \\[\\]uint8 = \\[\\]byte{0x1, 0x3}\n\n"
 	testHelperFailure(c, "Check([]byte{1}, chk, []byte{3})", false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check([]byte{1, 2}, checker, []byte{1, 3})
 		})
 }
@@ -362,7 +362,7 @@ func (s *HelpersS) TestValueLoggingWithMultiLine(c *check.C) {
 		"\\.+     \"b\\\\n\" \\+\n" +
 		"\\.+     \"c\"\n\n"
 	testHelperFailure(c, `Check("a\nb\n", chk, "a\nb\nc")`, false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check("a\nb\n", checker, "a\nb\nc")
 		})
 }
@@ -377,7 +377,7 @@ func (s *HelpersS) TestValueLoggingWithMultiLineException(c *check.C) {
 		"\\.+     \"a\\\\n\" \\+\n" +
 		"\\.+     \"b\"\n\n"
 	testHelperFailure(c, `Check("a b\n", chk, "a\nb")`, false, false, log,
-		func() interface{} {
+		func() any {
 			return c.Check("a b\n", checker, "a\nb")
 		})
 }
@@ -482,8 +482,8 @@ func (s *HelpersS) TestTestName(c *check.C) {
 // -----------------------------------------------------------------------
 // A couple of helper functions to test helper functions. :-)
 
-func testHelperSuccess(c *check.C, name string, expectedResult interface{}, closure func() interface{}) {
-	var result interface{}
+func testHelperSuccess(c *check.C, name string, expectedResult any, closure func() any) {
+	var result any
 	defer (func() {
 		if err := recover(); err != nil {
 			panic(err)
@@ -499,8 +499,8 @@ func testHelperSuccess(c *check.C, name string, expectedResult interface{}, clos
 	result = closure()
 }
 
-func testHelperFailure(c *check.C, name string, expectedResult interface{}, shouldStop bool, log string, closure func() interface{}) {
-	var result interface{}
+func testHelperFailure(c *check.C, name string, expectedResult any, shouldStop bool, log string, closure func() any) {
+	var result any
 	defer (func() {
 		if err := recover(); err != nil {
 			panic(err)
