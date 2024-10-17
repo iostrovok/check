@@ -92,13 +92,13 @@ func (c *C) GetTestLog() string {
 
 // Log logs some information into the test error output.
 // The provided arguments are assembled together into a string with fmt.Sprint.
-func (c *C) Log(args ...interface{}) {
+func (c *C) Log(args ...any) {
 	c.log(args...)
 }
 
 // Log logs some information into the test error output.
 // The provided arguments are assembled together into a string with fmt.Sprintf.
-func (c *C) Logf(format string, args ...interface{}) {
+func (c *C) Logf(format string, args ...any) {
 	c.logf(format, args...)
 }
 
@@ -116,7 +116,7 @@ func (c *C) Output(calldepth int, s string) error {
 
 // Error logs an error into the test error output and marks the test as failed.
 // The provided arguments are assembled together into a string with fmt.Sprint.
-func (c *C) Error(args ...interface{}) {
+func (c *C) Error(args ...any) {
 	c.logCaller(1)
 	c.logString(fmt.Sprint("Error: ", fmt.Sprint(args...)))
 	c.logNewLine()
@@ -125,7 +125,7 @@ func (c *C) Error(args ...interface{}) {
 
 // Errorf logs an error into the test error output and marks the test as failed.
 // The provided arguments are assembled together into a string with fmt.Sprintf.
-func (c *C) Errorf(format string, args ...interface{}) {
+func (c *C) Errorf(format string, args ...any) {
 	c.logCaller(1)
 	c.logString(fmt.Sprintf("Error: "+format, args...))
 	c.logNewLine()
@@ -135,7 +135,7 @@ func (c *C) Errorf(format string, args ...interface{}) {
 // Fatal logs an error into the test error output, marks the test as failed, and
 // stops the test execution. The provided arguments are assembled together into
 // a string with fmt.Sprint.
-func (c *C) Fatal(args ...interface{}) {
+func (c *C) Fatal(args ...any) {
 	c.logCaller(1)
 	c.logString(fmt.Sprint("Error: ", fmt.Sprint(args...)))
 	c.logNewLine()
@@ -145,7 +145,7 @@ func (c *C) Fatal(args ...interface{}) {
 // Fatlaf logs an error into the test error output, marks the test as failed, and
 // stops the test execution. The provided arguments are assembled together into
 // a string with fmt.Sprintf.
-func (c *C) Fatalf(format string, args ...interface{}) {
+func (c *C) Fatalf(format string, args ...any) {
 	c.logCaller(1)
 	c.logString(fmt.Sprint("Error: ", fmt.Sprintf(format, args...)))
 	c.logNewLine()
@@ -163,8 +163,8 @@ func (c *C) Fatalf(format string, args ...interface{}) {
 //
 // Extra arguments provided to the function are logged next to the reported
 // problem when the matching fails.
-func (c *C) Check(obtained interface{}, checker Checker, args ...interface{}) bool {
-	return c.internalCheck("Check", obtained, checker, args...)
+func (c *C) Check(obtained any, checker Checker, args ...any) bool {
+	return c.internalCheck(0, "Check", obtained, checker, args...)
 }
 
 // Assert ensures that the first value matches the expected value according
@@ -175,15 +175,17 @@ func (c *C) Check(obtained interface{}, checker Checker, args ...interface{}) bo
 //
 // Extra arguments provided to the function are logged next to the reported
 // problem when the matching fails.
-func (c *C) Assert(obtained interface{}, checker Checker, args ...interface{}) {
-	if !c.internalCheck("Assert", obtained, checker, args...) {
+func (c *C) Assert(obtained any, checker Checker, args ...any) {
+	if !c.internalCheck(0, "Assert", obtained, checker, args...) {
 		c.stopNow()
 	}
 }
 
-func (c *C) internalCheck(funcName string, obtained interface{}, checker Checker, args ...interface{}) bool {
+func (c *C) internalCheck(addSkip int, funcName string, obtained any, checker Checker, args ...any) bool {
+	addSkipped := addSkip + 2
+
 	if checker == nil {
-		c.logCaller(2)
+		c.logCaller(addSkipped)
 		c.logString(fmt.Sprintf("%s(obtained, nil!?, ...):", funcName))
 		c.logString("Oops.. you've provided a nil checker!")
 		c.logNewLine()
@@ -200,12 +202,12 @@ func (c *C) internalCheck(funcName string, obtained interface{}, checker Checker
 		}
 	}
 
-	params := append([]interface{}{obtained}, args...)
+	params := append([]any{obtained}, args...)
 	info := checker.Info()
 
 	if len(params) != len(info.Params) {
 		names := append([]string{info.Params[0], info.Name}, info.Params[1:]...)
-		c.logCaller(2)
+		c.logCaller(addSkipped)
 		c.logString(fmt.Sprintf("%s(%s):", funcName, strings.Join(names, ", ")))
 		c.logString(fmt.Sprintf("Wrong number of parameters for %s: want %d, got %d", info.Name, len(names), len(params)+1))
 		c.logNewLine()
@@ -219,7 +221,7 @@ func (c *C) internalCheck(funcName string, obtained interface{}, checker Checker
 	// Do the actual check.
 	result, error := checker.Check(params, names)
 	if !result || error != "" {
-		c.logCaller(2)
+		c.logCaller(addSkipped)
 		for i := 0; i != len(params); i++ {
 			c.logValue(names[i], params[i])
 		}

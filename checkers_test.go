@@ -2,6 +2,7 @@ package check_test
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 	"runtime"
@@ -18,16 +19,18 @@ func testInfo(c *check.C, checker check.Checker, name string, paramNames []strin
 	if info.Name != name {
 		c.Fatalf("Got name %s, expected %s", info.Name, name)
 	}
+
 	if !reflect.DeepEqual(info.Params, paramNames) {
 		c.Fatalf("Got param names %#v, expected %#v", info.Params, paramNames)
 	}
 }
 
-func testCheck(c *check.C, checker check.Checker, result bool, error string, params ...interface{}) ([]interface{}, []string) {
+func testCheck(c *check.C, checker check.Checker, result bool, error string, params ...any) ([]any, []string) {
 	info := checker.Info()
 	if len(params) != len(info.Params) {
 		c.Fatalf("unexpected param count in test; expected %d got %d", len(info.Params), len(params))
 	}
+
 	names := append([]string{}, info.Params...)
 	result_, error_ := checker.Check(params, names)
 	if result_ != result || error_ != error {
@@ -37,7 +40,7 @@ func testCheck(c *check.C, checker check.Checker, result bool, error string, par
 	return params, names
 }
 
-func testCheckNoLine(c *check.C, checker check.Checker, result bool, error string, params ...interface{}) ([]interface{}, []string) {
+func testCheckNoLine(c *check.C, checker check.Checker, result bool, error string, params ...any) ([]any, []string) {
 	info := checker.Info()
 	if len(params) != len(info.Params) {
 		c.Fatalf("unexpected param count in test; expected %d got %d", len(info.Params), len(params))
@@ -231,9 +234,11 @@ func (s *CheckersS) TestHasLenMoreThan(c *check.C) {
 	testCheck(c, check.HasLenMoreThan, true, "", []string{"1", "2", "3", "4"}, 2)
 	testCheck(c, check.HasLenMoreThan, true, "", []string{}, int64(-2))
 
+	testCheck(c, check.HasLenMoreThan, true, "", map[int]any{1: 1, 2: "", 3: 0, 4: "10"}, uint(3))
+
 	testCheck(c, check.HasLenMoreThan, false, "", []int{1, 2}, 2)
 	testCheck(c, check.HasLenMoreThan, false, "", []int{1, 2}, 3)
-	testCheck(c, check.HasLenMoreThan, false, "n must be an int*, not string", []int{1, 2}, "2")
+	testCheck(c, check.HasLenMoreThan, false, "n must be an *int, not string", []int{1, 2}, "2")
 	testCheck(c, check.HasLenMoreThan, false, "obtained value type has no length property", nil, 2)
 }
 
@@ -348,8 +353,8 @@ func (s *CheckersS) TestFitsTypeOf(c *check.C) {
 	testCheck(c, check.FitsTypeOf, true, "", &simpleStruct{42}, &simpleStruct{})
 
 	// Some bad values
-	testCheck(c, check.FitsTypeOf, false, "Invalid sample value", 1, interface{}(nil))
-	testCheck(c, check.FitsTypeOf, false, "", interface{}(nil), 0)
+	testCheck(c, check.FitsTypeOf, false, "Invalid sample value", 1, any(nil))
+	testCheck(c, check.FitsTypeOf, false, "", any(nil), 0)
 }
 
 func (s *CheckersS) TestImplements(c *check.C) {
@@ -362,8 +367,8 @@ func (s *CheckersS) TestImplements(c *check.C) {
 
 	// Some bad values
 	testCheck(c, check.Implements, false, "ifaceptr should be a pointer to an interface variable", 0, errors.New(""))
-	testCheck(c, check.Implements, false, "ifaceptr should be a pointer to an interface variable", 0, interface{}(nil))
-	testCheck(c, check.Implements, false, "", interface{}(nil), &e)
+	testCheck(c, check.Implements, false, "ifaceptr should be a pointer to an interface variable", 0, any(nil))
+	testCheck(c, check.Implements, false, "", any(nil), &e)
 }
 
 func (s *CheckersS) TestMoreThan(c *check.C) {
@@ -533,4 +538,64 @@ func (s *CheckersS) TestEqualsFloat32(c *check.C) {
 	testCheck(c, check.EqualsFloat32, false, "Comparing incomparable type as float32: string and string", "42", "42")
 	testCheck(c, check.EqualsFloat32, false, "Comparing incomparable type as float32: string and []uint8", "42", []byte("42"))
 	testCheck(c, check.EqualsFloat32, false, "Comparing incomparable type as float32: []uint8 and string", []byte("421"), "421")
+}
+
+func (s *CheckersS) TestContains(c *check.C) {
+	testCheck(c, check.Contains, false, "expected value type is not Map, Array, Slice, Chan or String", 42, 42)
+	testCheck(c, check.Contains, true, "", 42, []int{42})
+	testCheck(c, check.Contains, false, "expected does not contain obtained", 42, []int64{42})
+	testCheck(c, check.Contains, false, "expected does not contain obtained", 42.0, []int64{11, 42, -10})
+	testCheck(c, check.Contains, true, "", int64(42), []int64{12, 42, 10})
+	testCheck(c, check.Contains, false, "expected does not contain obtained", int32(42), []int64{42, 10})
+	testCheck(c, check.Contains, false, "expected does not contain obtained", int32(42), []int64{0, 10})
+
+	type A struct {
+		a int
+		b int
+	}
+
+	testCheck(c, check.Contains, true, "", A{a: 10, b: 20}, []A{{a: 1, b: 0}, {a: 10, b: 20}})
+	testCheck(c, check.Contains, true, "", &A{a: 10, b: 20}, []*A{{a: 1, b: 0}, {a: 10, b: 20}})
+	testCheck(c, check.Contains, true, "", &A{a: 10, b: 20}, []*A{{a: 1, b: 0}, {a: 10, b: 20}, {a: 10, b: 20}})
+	testCheck(c, check.Contains, false, "expected does not contain obtained", &A{b: 20, a: 10}, []*A{{a: 5, b: 16}, {a: 1, b: 0}, {a: 5, b: 16}})
+}
+
+func (s *CheckersS) TestNotContains(c *check.C) {
+	testCheck(c, check.NotContains, true, "", 42, 42)
+	testCheck(c, check.NotContains, false, "expected value contains obtained value", 42, []int{42})
+	testCheck(c, check.NotContains, true, "", 42, []int64{42})
+	testCheck(c, check.NotContains, true, "", 42.0, []int64{11, 42, -10})
+	testCheck(c, check.NotContains, false, "expected value contains obtained value", int64(42), []int64{12, 42, 10})
+	testCheck(c, check.NotContains, true, "", int32(42), []int64{42, 10})
+	testCheck(c, check.NotContains, true, "", int32(42), []int64{0, 10})
+
+	type A struct {
+		a int
+		b int
+	}
+
+	testCheck(c, check.NotContains, false, "expected value contains obtained value", A{a: 10, b: 20}, []A{{a: 1, b: 0}, {a: 10, b: 20}})
+	testCheck(c, check.NotContains, false, "expected value contains obtained value", &A{a: 10, b: 20}, []*A{{a: 1, b: 0}, {a: 10, b: 20}})
+	testCheck(c, check.NotContains, false, "expected value contains obtained value", &A{a: 10, b: 20}, []*A{{a: 1, b: 0}, {a: 10, b: 20}, {a: 10, b: 20}})
+	testCheck(c, check.NotContains, true, "", &A{b: 20, a: 10}, []*A{{a: 5, b: 16}, {a: 1, b: 0}, {a: 5, b: 16}})
+}
+
+func (s *CheckersS) TestErrorIs(c *check.C) {
+	e1 := errors.New("my error")
+	testCheck(c, check.ErrorIs, false, "expected value is not an error", e1, 1)
+	testCheck(c, check.ErrorIs, false, "obtained value is not an error", 1, e1)
+	testCheck(c, check.ErrorIs, true, "", e1, e1)
+
+	e2 := fmt.Errorf("level 1 error: %w", e1)
+	testCheck(c, check.ErrorIs, true, "", e2, e1)
+	e3 := fmt.Errorf("level 2 error: %w", e2)
+	testCheck(c, check.ErrorIs, true, "", e3, e1)
+	testCheck(c, check.ErrorIs, true, "", e3, e2)
+	//
+
+	testCheck(c, check.ErrorIs, false, "expected error doesn't contains obtained error", errors.New("my error"), e1)
+	testCheck(c, check.ErrorIs, false, "expected error doesn't contains obtained error", e1, errors.New("my error"))
+
+	testCheck(c, check.ErrorIs, false, "expected error doesn't contains obtained error", errors.New("my error"), e3)
+	testCheck(c, check.ErrorIs, false, "expected error doesn't contains obtained error", e3, errors.New("my error"))
 }

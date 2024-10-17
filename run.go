@@ -14,12 +14,12 @@ import (
 // -----------------------------------------------------------------------
 // Test suite registry.
 
-var allSuites []interface{}
+var allSuites []any
 
 // Suite registers the given value as a test suite to be run. Any methods
 // starting with the Test prefix in the given value will be considered as
 // a test method.
-func Suite(suite interface{}) interface{} {
+func Suite(suite any) any {
 	allSuites = append(allSuites, suite)
 	return suite
 }
@@ -95,7 +95,7 @@ func RunAll(runConf *RunConf) *CheckTestResult {
 }
 
 // Run runs the provided test suite using the provided run configuration.
-func Run(suite interface{}, runConf *RunConf) *CheckTestResult {
+func Run(suite any, runConf *RunConf) *CheckTestResult {
 	runner := newSuiteRunner(suite, runConf)
 	return runner.run()
 }
@@ -112,7 +112,7 @@ func ListAll(runConf *RunConf) []string {
 
 // List returns the names of the test functions in the given
 // suite that will be run with the provided run configuration.
-func List(suite interface{}, runConf *RunConf) []string {
+func List(suite any, runConf *RunConf) []string {
 	var names []string
 	runner := newSuiteRunner(suite, runConf)
 	for _, t := range runner.tests {

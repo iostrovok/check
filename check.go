@@ -2,8 +2,7 @@
 //
 // For details about the project, see:
 //
-//     http://labix.org/gocheck
-//
+//	http://labix.org/gocheck
 package check
 
 import (
@@ -191,11 +190,11 @@ func (c *C) MkDir() string {
 // -----------------------------------------------------------------------
 // Low-level logging functions.
 
-func (c *C) log(args ...interface{}) {
+func (c *C) log(args ...any) {
 	c.writeLog([]byte(fmt.Sprint(args...) + "\n"))
 }
 
-func (c *C) logf(format string, args ...interface{}) {
+func (c *C) logf(format string, args ...any) {
 	c.writeLog([]byte(fmt.Sprintf(format+"\n", args...)))
 }
 
@@ -210,7 +209,7 @@ func (c *C) writeLog(buf []byte) {
 	}
 }
 
-func hasStringOrError(x interface{}) (ok bool) {
+func hasStringOrError(x any) (ok bool) {
 	_, ok = x.(fmt.Stringer)
 	if ok {
 		return
@@ -219,7 +218,7 @@ func hasStringOrError(x interface{}) (ok bool) {
 	return
 }
 
-func (c *C) logValue(label string, value interface{}) {
+func (c *C) logValue(label string, value any) {
 	if label == "" {
 		if hasStringOrError(value) {
 			c.logf("... %#v (%q)", value, value)
@@ -335,7 +334,7 @@ func (c *C) logCode(path string, line int) {
 var valueGo = filepath.Join("reflect", "value.go")
 var asmGo = filepath.Join("runtime", "asm_")
 
-func (c *C) logPanic(skip int, value interface{}) {
+func (c *C) logPanic(skip int, value any) {
 	skip++ // Our own frame.
 	initialSkip := skip
 	for ; ; skip++ {
@@ -527,7 +526,7 @@ func (tracker *resultTracker) _loopRoutine() {
 // The underlying suite runner.
 
 type suiteRunner struct {
-	suite                     interface{}
+	suite                     any
 	setUpSuite, tearDownSuite *methodType
 	setUpTest, tearDownTest   *methodType
 	tests                     []*methodType
@@ -558,7 +557,7 @@ type RunConf struct {
 }
 
 // Create a new suiteRunner able to run all methods in the given suite.
-func newSuiteRunner(suite interface{}, runConf *RunConf) *suiteRunner {
+func newSuiteRunner(suite any, runConf *RunConf) *suiteRunner {
 	var conf RunConf
 	if runConf != nil {
 		conf = *runConf
