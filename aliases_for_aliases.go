@@ -1,8 +1,6 @@
 package check
 
-// Pacakge provides the compatibility with oOther test packages
-
-// func (c *C) NotNil(obtained any, args ...any) bool
+// Package provides the compatibility with oOther test packages
 
 func (c *C) Nil(obtained any, args ...any) bool {
 	return c.IsNil(obtained, args...)
@@ -38,6 +36,10 @@ func (c *C) True(obtained any, args ...any) bool {
 
 func (c *C) False(obtained any, args ...any) bool {
 	return c.IsFalse(obtained, args...)
+}
+
+func (c *C) Empty(obtained any, args ...any) bool {
+	return c.IsEmpty(obtained, args...)
 }
 
 func (c *C) Len(obtained, expected any, args ...any) bool {

@@ -125,6 +125,14 @@ func (c *C) IsTrue(obtained any, args ...any) bool {
 	return c.runObtainedAlias("IsTrue", obtained, IsTrue, args)
 }
 
+func (c *C) IsEmpty(obtained any, args ...any) bool {
+	return c.runObtainedAlias("IsEmpty", obtained, IsEmpty, args)
+}
+
+func (c *C) NotEmpty(obtained any, args ...any) bool {
+	return c.runObtainedAlias("NotEmpty", obtained, NotEmpty, args)
+}
+
 func (c *C) LessOrEqualThan(obtained, expected any, args ...any) bool {
 	return c.runObtainedExpectedAlias("LessOrEqualThan", obtained, expected, LessOrEqualThan, args)
 }
